@@ -33,7 +33,7 @@ export function getNode(key: string): ChatbotNode {
     if (option) {
       return {
         question: `You selected ${option.text}. What complexity level do you prefer?`,
-        options: ["Easy", "Medium", "Strong"],
+        options: ["Easy", "Medium", "Hard"],
         isEndpoint: true,
         text: option.text,
       }

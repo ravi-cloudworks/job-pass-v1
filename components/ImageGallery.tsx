@@ -153,7 +153,14 @@ const handleCompleteInterview = (videoUrl: string) => {  // Add videoUrl paramet
         </TabsList>
         <ScrollArea className="flex-1">
           <TabsContent value="new" className="m-0 p-2">
-            {renderImages(filteredImages)}
+         {newImages.length > 0 ? (
+              renderImages(filteredImages)
+            ) : (
+              <Alert>
+                <AlertTitle>No New interviews</AlertTitle>
+                <AlertDescription>Please use the chatbot to generate AI interviews.</AlertDescription>
+              </Alert>
+            )}
           </TabsContent>
           <TabsContent value="completed" className="m-0 p-2">
             {completedImages.length > 0 ? (

@@ -41,7 +41,23 @@
         "situational_questions",
         "behavioral_questions"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "situational_questions": {
+          "standard": {
+            "easy": ["SIQU-001"],
+            "medium": ["SIQU-002"],
+            "hard": ["SIQU-003"]
+          }
+        },
+        "behavioral_questions": {
+          "standard": {
+            "easy": ["BEQU-001"],
+            "medium": ["BEQU-002"],
+            "hard": ["BEQU-003"]
+          }
+        }
+      }
     },
     "leadership_managerial": {
       "text": "Leadership/Managerial",
@@ -51,7 +67,30 @@
         "team_management",
         "conflict_resolution"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "strategic_decision": {
+          "standard": {
+            "easy": ["STDE-001"],
+            "medium": ["STDE-002"],
+            "hard": ["STDE-003"]
+          }
+        },
+        "team_management": {
+          "standard": {
+            "easy": ["TEMA-001"],
+            "medium": ["TEMA-002"],
+            "hard": ["TEMA-003"]
+          }
+        },
+        "conflict_resolution": {
+          "standard": {
+            "easy": ["CORE-001"],
+            "medium": ["CORE-002"],
+            "hard": ["CORE-003"]
+          }
+        }
+      }
     },
     "software_engineer": {
       "text": "Software Engineer",
@@ -71,15 +110,29 @@
         "go_gin"
       ],
       "isEndpoint": true,
-  "questionSetId": {
-    "python_django": {
-      "standard": {
-        "easy": ["PYDJ-001"],
-        "medium": ["PYDJ-002"],
-        "strong": ["PYDJ-003"]
+      "questionSetId": {
+        "python_django": {
+          "standard": {
+            "easy": ["PYDJ-001"],
+            "medium": ["PYDJ-002"],
+            "hard": ["PYDJ-003"]
+          }
+        },
+        "nodejs_express": {
+          "standard": {
+            "easy": ["NOEX-001"],
+            "medium": ["NOEX-002"],
+            "hard": ["NOEX-003"]
+          }
+        },
+        "go_gin": {
+          "standard": {
+            "easy": ["GOGI-001"],
+            "medium": ["GOGI-002"],
+            "hard": ["GOGI-003"]
+          }
+        }
       }
-    }
-  }
     },
     "frontend_dev": {
       "text": "Frontend Development",
@@ -89,7 +142,30 @@
         "nextjs",
         "angular"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "reactjs": {
+          "standard": {
+            "easy": ["REJA-001"],
+            "medium": ["REJA-002"],
+            "hard": ["REJA-003"]
+          }
+        },
+        "nextjs": {
+          "standard": {
+            "easy": ["NEJS-001"],
+            "medium": ["NEJS-002"],
+            "hard": ["NEJS-003"]
+          }
+        },
+        "angular": {
+          "standard": {
+            "easy": ["AN-001"],
+            "medium": ["AN-002"],
+            "hard": ["AN-003"]
+          }
+        }
+      }
     },
     "fullstack_dev": {
       "text": "Full Stack Development",
@@ -99,7 +175,30 @@
         "mean",
         "jamstack"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "mern": {
+          "standard": {
+            "easy": ["ME-001"],
+            "medium": ["ME-002"],
+            "hard": ["ME-003"]
+          }
+        },
+        "mean": {
+          "standard": {
+            "easy": ["ME-001"],
+            "medium": ["ME-002"],
+            "hard": ["ME-003"]
+          }
+        },
+        "jamstack": {
+          "standard": {
+            "easy": ["JAST-001"],
+            "medium": ["JAST-002"],
+            "hard": ["JAST-003"]
+          }
+        }
+      }
     },
     "data_scientist": {
       "text": "Data Scientist",
@@ -118,7 +217,30 @@
         "tensorflow_keras",
         "pytorch"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "scikit_learn": {
+          "standard": {
+            "easy": ["SCLE-001"],
+            "medium": ["SCLE-002"],
+            "hard": ["SCLE-003"]
+          }
+        },
+        "tensorflow_keras": {
+          "standard": {
+            "easy": ["TEKE-001"],
+            "medium": ["TEKE-002"],
+            "hard": ["TEKE-003"]
+          }
+        },
+        "pytorch": {
+          "standard": {
+            "easy": ["PY-001"],
+            "medium": ["PY-002"],
+            "hard": ["PY-003"]
+          }
+        }
+      }
     },
     "data_analysis": {
       "text": "Data Analysis",
@@ -127,7 +249,23 @@
         "python_pandas",
         "r_tools"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "python_pandas": {
+          "standard": {
+            "easy": ["PYPA-001"],
+            "medium": ["PYPA-002"],
+            "hard": ["PYPA-003"]
+          }
+        },
+        "r_tools": {
+          "standard": {
+            "easy": ["RETO-001"],
+            "medium": ["RETO-002"],
+            "hard": ["RETO-003"]
+          }
+        }
+      }
     },
     "cloud_ai": {
       "text": "Cloud AI Solutions",
@@ -137,7 +275,30 @@
         "gcp_ai",
         "azure_ml"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "aws_sagemaker": {
+          "standard": {
+            "easy": ["AWSA-001"],
+            "medium": ["AWSA-002"],
+            "hard": ["AWSA-003"]
+          }
+        },
+        "gcp_ai": {
+          "standard": {
+            "easy": ["GCAI-001"],
+            "medium": ["GCAI-002"],
+            "hard": ["GCAI-003"]
+          }
+        },
+        "azure_ml": {
+          "standard": {
+            "easy": ["AZML-001"],
+            "medium": ["AZML-002"],
+            "hard": ["AZML-003"]
+          }
+        }
+      }
     },
     "ml_engineer": {
       "text": "Machine Learning Engineer",
@@ -147,7 +308,30 @@
         "model_optimization",
         "mlops"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "ml_pipelines": {
+          "standard": {
+            "easy": ["MLPI-001"],
+            "medium": ["MLPI-002"],
+            "hard": ["MLPI-003"]
+          }
+        },
+        "model_optimization": {
+          "standard": {
+            "easy": ["MOOP-001"],
+            "medium": ["MOOP-002"],
+            "hard": ["MOOP-003"]
+          }
+        },
+        "mlops": {
+          "standard": {
+            "easy": ["ML-001"],
+            "medium": ["ML-002"],
+            "hard": ["ML-003"]
+          }
+        }
+      }
     },
     "devops_engineer": {
       "text": "DevOps Engineer",
@@ -157,7 +341,30 @@
         "k8s_docker",
         "terraform"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "cicd": {
+          "standard": {
+            "easy": ["CI-001"],
+            "medium": ["CI-002"],
+            "hard": ["CI-003"]
+          }
+        },
+        "k8s_docker": {
+          "standard": {
+            "easy": ["K8DO-001"],
+            "medium": ["K8DO-002"],
+            "hard": ["K8DO-003"]
+          }
+        },
+        "terraform": {
+          "standard": {
+            "easy": ["TE-001"],
+            "medium": ["TE-002"],
+            "hard": ["TE-003"]
+          }
+        }
+      }
     },
     "cybersecurity_specialist": {
       "text": "Cybersecurity Specialist",
@@ -178,7 +385,23 @@
         "pentest_tools",
         "pentest_methods"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "pentest_tools": {
+          "standard": {
+            "easy": ["PETO-001"],
+            "medium": ["PETO-002"],
+            "hard": ["PETO-003"]
+          }
+        },
+        "pentest_methods": {
+          "standard": {
+            "easy": ["PEME-001"],
+            "medium": ["PEME-002"],
+            "hard": ["PEME-003"]
+          }
+        }
+      }
     },
     "soc_analyst": {
       "text": "Security Operations (SOC Analyst)",
@@ -188,7 +411,30 @@
         "soc_tier2",
         "soc_tier3"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "soc_tier1": {
+          "standard": {
+            "easy": ["SOTI-001"],
+            "medium": ["SOTI-002"],
+            "hard": ["SOTI-003"]
+          }
+        },
+        "soc_tier2": {
+          "standard": {
+            "easy": ["SOTI-001"],
+            "medium": ["SOTI-002"],
+            "hard": ["SOTI-003"]
+          }
+        },
+        "soc_tier3": {
+          "standard": {
+            "easy": ["SOTI-001"],
+            "medium": ["SOTI-002"],
+            "hard": ["SOTI-003"]
+          }
+        }
+      }
     },
     "cloud_security": {
       "text": "Cloud Security",
@@ -198,7 +444,30 @@
         "azure_security",
         "gcp_security"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "aws_security": {
+          "standard": {
+            "easy": ["AWSE-001"],
+            "medium": ["AWSE-002"],
+            "hard": ["AWSE-003"]
+          }
+        },
+        "azure_security": {
+          "standard": {
+            "easy": ["AZSE-001"],
+            "medium": ["AZSE-002"],
+            "hard": ["AZSE-003"]
+          }
+        },
+        "gcp_security": {
+          "standard": {
+            "easy": ["GCSE-001"],
+            "medium": ["GCSE-002"],
+            "hard": ["GCSE-003"]
+          }
+        }
+      }
     },
     "iam": {
       "text": "Identity and Access Management (IAM)",
@@ -208,7 +477,30 @@
         "sso_solutions",
         "rbac"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "ad_management": {
+          "standard": {
+            "easy": ["ADMA-001"],
+            "medium": ["ADMA-002"],
+            "hard": ["ADMA-003"]
+          }
+        },
+        "sso_solutions": {
+          "standard": {
+            "easy": ["SSSO-001"],
+            "medium": ["SSSO-002"],
+            "hard": ["SSSO-003"]
+          }
+        },
+        "rbac": {
+          "standard": {
+            "easy": ["RB-001"],
+            "medium": ["RB-002"],
+            "hard": ["RB-003"]
+          }
+        }
+      }
     },
     "network_security": {
       "text": "Network Security",
@@ -218,7 +510,30 @@
         "ids_ips",
         "zero_trust"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "firewalls_vpn": {
+          "standard": {
+            "easy": ["FIVP-001"],
+            "medium": ["FIVP-002"],
+            "hard": ["FIVP-003"]
+          }
+        },
+        "ids_ips": {
+          "standard": {
+            "easy": ["IDIP-001"],
+            "medium": ["IDIP-002"],
+            "hard": ["IDIP-003"]
+          }
+        },
+        "zero_trust": {
+          "standard": {
+            "easy": ["ZETR-001"],
+            "medium": ["ZETR-002"],
+            "hard": ["ZETR-003"]
+          }
+        }
+      }
     },
     "incident_response": {
       "text": "Incident Response",
@@ -228,7 +543,30 @@
         "malware_analysis",
         "threat_hunting"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "digital_forensics": {
+          "standard": {
+            "easy": ["DIFO-001"],
+            "medium": ["DIFO-002"],
+            "hard": ["DIFO-003"]
+          }
+        },
+        "malware_analysis": {
+          "standard": {
+            "easy": ["MAAN-001"],
+            "medium": ["MAAN-002"],
+            "hard": ["MAAN-003"]
+          }
+        },
+        "threat_hunting": {
+          "standard": {
+            "easy": ["THHU-001"],
+            "medium": ["THHU-002"],
+            "hard": ["THHU-003"]
+          }
+        }
+      }
     },
     "project_interview": {
       "text": "Project Interview",
@@ -255,7 +593,30 @@
         "web_backend",
         "web_fullstack"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "web_frontend": {
+          "standard": {
+            "easy": ["WEFR-001"],
+            "medium": ["WEFR-002"],
+            "hard": ["WEFR-003"]
+          }
+        },
+        "web_backend": {
+          "standard": {
+            "easy": ["WEBA-001"],
+            "medium": ["WEBA-002"],
+            "hard": ["WEBA-003"]
+          }
+        },
+        "web_fullstack": {
+          "standard": {
+            "easy": ["WEFU-001"],
+            "medium": ["WEFU-002"],
+            "hard": ["WEFU-003"]
+          }
+        }
+      }
     },
     "mobile_dev": {
       "text": "Mobile Development",
@@ -265,7 +626,30 @@
         "ios",
         "cross_platform"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "android": {
+          "standard": {
+            "easy": ["AN-001"],
+            "medium": ["AN-002"],
+            "hard": ["AN-003"]
+          }
+        },
+        "ios": {
+          "standard": {
+            "easy": ["IO-001"],
+            "medium": ["IO-002"],
+            "hard": ["IO-003"]
+          }
+        },
+        "cross_platform": {
+          "standard": {
+            "easy": ["CRPL-001"],
+            "medium": ["CRPL-002"],
+            "hard": ["CRPL-003"]
+          }
+        }
+      }
     },
     "research_project": {
       "text": "Research Project",
@@ -276,7 +660,37 @@
         "cloud_research",
         "iot_research"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "ai_research": {
+          "standard": {
+            "easy": ["AIRE-001"],
+            "medium": ["AIRE-002"],
+            "hard": ["AIRE-003"]
+          }
+        },
+        "blockchain_research": {
+          "standard": {
+            "easy": ["BLRE-001"],
+            "medium": ["BLRE-002"],
+            "hard": ["BLRE-003"]
+          }
+        },
+        "cloud_research": {
+          "standard": {
+            "easy": ["CLRE-001"],
+            "medium": ["CLRE-002"],
+            "hard": ["CLRE-003"]
+          }
+        },
+        "iot_research": {
+          "standard": {
+            "easy": ["IORE-001"],
+            "medium": ["IORE-002"],
+            "hard": ["IORE-003"]
+          }
+        }
+      }
     },
     "cybersecurity_project": {
       "text": "Cybersecurity Project",
@@ -294,7 +708,23 @@
         "industry_specific",
         "general_security"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "industry_specific": {
+          "standard": {
+            "easy": ["INSP-001"],
+            "medium": ["INSP-002"],
+            "hard": ["INSP-003"]
+          }
+        },
+        "general_security": {
+          "standard": {
+            "easy": ["GESE-001"],
+            "medium": ["GESE-002"],
+            "hard": ["GESE-003"]
+          }
+        }
+      }
     },
     "incident_response_plan": {
       "text": "Incident Response Plan",
@@ -303,7 +733,23 @@
         "simulated_incident",
         "real_incident"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "simulated_incident": {
+          "standard": {
+            "easy": ["SIIN-001"],
+            "medium": ["SIIN-002"],
+            "hard": ["SIIN-003"]
+          }
+        },
+        "real_incident": {
+          "standard": {
+            "easy": ["REIN-001"],
+            "medium": ["REIN-002"],
+            "hard": ["REIN-003"]
+          }
+        }
+      }
     },
     "threat_modeling": {
       "text": "Threat Modeling",
@@ -313,9 +759,33 @@
         "dread",
         "pasta"
       ],
-      "isEndpoint": true
+      "isEndpoint": true,
+      "questionSetId": {
+        "stride": {
+          "standard": {
+            "easy": ["ST-001"],
+            "medium": ["ST-002"],
+            "hard": ["ST-003"]
+          }
+        },
+        "dread": {
+          "standard": {
+            "easy": ["DR-001"],
+            "medium": ["DR-002"],
+            "hard": ["DR-003"]
+          }
+        },
+        "pasta": {
+          "standard": {
+            "easy": ["PA-001"],
+            "medium": ["PA-002"],
+            "hard": ["PA-003"]
+          }
+        }
+      }
     }
-  },
+  }
+,
   "options": {
     "python_django": {
       "text": "Python + Django"
