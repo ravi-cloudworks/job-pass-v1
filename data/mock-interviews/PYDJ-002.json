@@ -1,0 +1,20 @@
+{
+  "id": "PYDJ-002",
+  "title": "# Django Advanced Concepts\n## System Design and Performance",
+      "time_limit": 300,
+  "questions": [
+    {
+      "id": "q1",
+      "question": "Explain how you would design a Django application to handle 10,000 concurrent users. What considerations would you make for database optimization and caching?"
+    },
+    {
+      "id": "q2", 
+      "question": "Walk through implementing a custom middleware in Django. When would you use it and what are the performance implications?"
+    },
+    {
+      "id": "q3",
+      "question": "How would you implement real-time features in Django? Compare Django Channels vs traditional REST approaches."
+    }
+  ]
+}
+
