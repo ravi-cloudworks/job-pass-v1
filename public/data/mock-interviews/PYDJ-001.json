@@ -1,0 +1,20 @@
+{
+  "id": "PYDJ-001",
+  "title": "# Django MVT Architecture\n## Fundamentals and Best Practices",
+  "time_limit": 180,
+  "questions": [
+    {
+      "id": "q1",
+      "question": "Looking at this MVT Architecture diagram:\n\n![MVT Flow](https://media.geeksforgeeks.org/wp-content/uploads/20211122171829/nikhilimagereedit.jpg)\n\nWhat's missing in the data flow? How would you improve it?"
+    },
+    {
+      "id": "q2", 
+      "question": "Review this Django model:\n```python\nclass Order(models.Model):\n    customer = models.ForeignKey(Customer)\n    items = models.ManyToManyField(Product)\n    total = models.DecimalField(max_digits=10)\n```\nIdentify three potential issues and suggest improvements."
+    },
+    {
+      "id": "q3",
+      "question": "Common authentication methods in Django:\n- Session-based\n- Token-based\n- Basic auth\n\nWhich modern authentication method is missing? Why is it crucial?"
+    }
+  ]
+}
+
