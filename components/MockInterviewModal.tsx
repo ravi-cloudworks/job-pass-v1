@@ -108,7 +108,7 @@ export default function MockInterviewModal({ onClose, onComplete, questionSetId 
     const fetchQuestions = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch(`/data/mock-interviews/${questionSetId}.json`)
+        const response = await fetch(`./data/mock-interviews/${questionSetId}.json`)
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
         
         const data: QuestionSet = await response.json()
