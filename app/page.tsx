@@ -14,17 +14,17 @@ const showcaseItems = [
   {
     title: "AI-Powered Creativity",
     description: "Unleash your imagination with our state-of-the-art AI INTERVIEW ASSISTANT.",
-    image: "/placeholder.svg?height=400&width=600&text=AI-Powered+Creativity",
+    image: "./placeholder.svg?height=400&width=600&text=AI-Powered+Creativity",
   },
   {
     title: "Effortless Editing",
     description: "Edit and refine your generated images with intuitive tools.",
-    image: "/placeholder.svg?height=400&width=600&text=Effortless+Editing",
+    image: "./placeholder.svg?height=400&width=600&text=Effortless+Editing",
   },
   {
     title: "Collaborate & Share",
     description: "Work together on projects and share your creations with the world.",
-    image: "/placeholder.svg?height=400&width=600&text=Collaborate+%26+Share",
+    image: "./placeholder.svg?height=400&width=600&text=Collaborate+%26+Share",
   },
 ]
 
@@ -100,7 +100,7 @@ Interview Easier
         <h2 className="text-3xl font-bold mb-8 text-center">How It Works</h2>
         <div className="relative">
           <img
-            src={showcaseItems[currentShowcase].image || "/placeholder.svg"}
+            src={showcaseItems[currentShowcase].image || "./placeholder.svg"}
             alt={showcaseItems[currentShowcase].title}
             className="w-full h-[400px] object-cover rounded-lg"
           />

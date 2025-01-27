@@ -29,7 +29,7 @@ export default function ChatPage() {
       // Simulate image generation delay
       await new Promise(resolve => setTimeout(resolve, 3000))
 
-      const newImage = `/placeholder.svg?height=300&width=300&text=${encodeURIComponent(prompt)}`
+      const newImage = `./placeholder.svg?height=300&width=300&text=${encodeURIComponent(prompt)}`
 
       if (!questionSetId) {
         console.warn("No questionSetId provided for image generation")

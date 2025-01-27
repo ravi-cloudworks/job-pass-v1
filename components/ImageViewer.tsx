@@ -19,7 +19,7 @@ export default function ImageViewer({ image, onClose }: ImageViewerProps) {
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </Button>
-        <img src={image || "/placeholder.svg"} alt="Full size" className="max-w-full max-h-full object-contain" />
+        <img src={image || "./placeholder.svg"} alt="Full size" className="max-w-full max-h-full object-contain" />
       </div>
     </div>
   )

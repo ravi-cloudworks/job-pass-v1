@@ -79,7 +79,7 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
         content: "Insufficient credits. Please scan the QR code to add more credits.",
         qrData: {
           amount: 10,
-          paymentUrl: "/placeholder.svg?height=200&width=200&text=Sample+QR+Code",
+          paymentUrl: "./placeholder.svg?height=200&width=200&text=Sample+QR+Code",
         },
       }
       setChatHistory((prev) => [...prev, paymentMessage])
@@ -114,7 +114,7 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
       content: "Insufficient credits. Please scan the QR code to add more credits.",
       qrData: {
         amount: 10,
-        paymentUrl: "/placeholder.svg?height=200&width=200&text=Sample+QR+Code",
+        paymentUrl: "./placeholder.svg?height=200&width=200&text=Sample+QR+Code",
       },
     };
     setChatHistory(prev => [...prev, paymentMessage]);
@@ -189,7 +189,7 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
                   {msg.type === "qr-payment" && msg.qrData && (
                     <div className="mt-2 cursor-pointer" onClick={() => setSelectedQR(msg.qrData?.paymentUrl || null)}>
                       <img
-                        src={msg.qrData.paymentUrl || "/placeholder.svg"}
+                        src={msg.qrData.paymentUrl || "./placeholder.svg"}
                         alt="Payment QR Code"
                         className="w-32 h-32 mx-auto"
                       />
@@ -199,7 +199,7 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
                   {msg.type === "image-generation" && msg.imageUrl && (
                     <div className="mt-2">
                       <img
-                        src={msg.imageUrl || "/placeholder.svg"}
+                        src={msg.imageUrl || "./placeholder.svg"}
                         alt="Generated Image"
                         className="w-full h-auto rounded-lg"
                       />

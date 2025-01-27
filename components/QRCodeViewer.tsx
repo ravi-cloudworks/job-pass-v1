@@ -15,7 +15,7 @@ export default function QRCodeViewer({ qrUrl, onClose }: QRCodeViewerProps) {
           <span className="sr-only">Close</span>
         </Button>
         <div className="flex flex-col items-center gap-4">
-          <img src={qrUrl || "/placeholder.svg"} alt="Payment QR Code" className="w-64 h-64" />
+          <img src={qrUrl || "./placeholder.svg"} alt="Payment QR Code" className="w-64 h-64" />
           <p className="text-center text-muted-foreground">Scan this QR code to add more credits</p>
         </div>
       </div>

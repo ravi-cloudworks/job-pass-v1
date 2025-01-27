@@ -90,7 +90,7 @@ const handleCompleteInterview = (videoUrl: string) => {  // Add videoUrl paramet
       {imagesToRender.map((image, index) => (
         <div key={index} className="relative group">
           <img
-            src={image.url || "/placeholder.svg"}
+            src={image.url || "./placeholder.svg"}
             alt={`Generated image ${index + 1}`}
             className="w-full h-auto rounded-lg cursor-pointer"
             onClick={() => handleImageClick(index)}
