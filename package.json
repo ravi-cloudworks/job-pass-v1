@@ -4,10 +4,9 @@
   "private": true,
   "homepage": "https://ravi-cloudworks.github.io/job-pass-v1",
   "scripts": {
-    "start": "next dev",
+    "dev": "next dev",
     "build": "next build",
-    "predeploy": "npm run build",
-    "deploy": "touch out/.nojekyll && gh-pages -d out -t true"
+    "deploy": "next build && touch out/.nojekyll && git add out/ && git commit -m \"Deploy\" && git subtree push --prefix out origin gh-pages"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

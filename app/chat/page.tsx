@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Chat from "@/components/Chat"
 import ImageGallery from "@/components/ImageGallery"
-import { useToast } from "@/components/ui/toast"
+import { useToast } from "@/hooks/use-toast"  // Update this import
 import { chatbotFlow } from "@/utils/chatbotFlow"
 
 interface ImageData {
@@ -18,7 +18,7 @@ interface ImageData {
 export default function ChatPage() {
   const [images, setImages] = useState<ImageData[]>([])
   const [filter, setFilter] = useState<string>("all")
-  const { addToast } = useToast() // Add this hook
+  const { toast } = useToast()  // Use the hook
 
   // console.log("Chatbot flow loaded:", chatbotFlow)
 
@@ -48,9 +48,10 @@ export default function ChatPage() {
 
     } catch (error) {
       console.error("Error adding image:", error)
-      addToast({
+      toast({
         title: "Error",
-        description: "Failed to generate image. Please try again."
+        description: "Failed to generate image. Please try again.",
+        variant: "destructive"
       })
       throw error
     }
@@ -62,7 +63,7 @@ export default function ChatPage() {
       const currentFavorites = newImages.filter(img => img.isFavorite && img.isCompleted).length
 
       if (!newImages[index].isFavorite && currentFavorites >= 10) {
-        addToast({  // Update this
+        toast({
           title: "Favorite limit reached",
           description: "You can only have up to 10 favorite interviews. Please remove a favorite before adding a new one."
         })

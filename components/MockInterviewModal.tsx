@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, VideoOff, X, Play, CheckSquare, Loader2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { useToast } from "@/components/ui/toast"
+import { useToast } from "@/hooks/use-toast"  // Update this import
 
 
 
@@ -30,7 +30,7 @@ interface QuestionSet {
 
 export default function MockInterviewModal({ onClose, onComplete, questionSetId }: MockInterviewModalProps) {
   // First, declare all state variables at the top
-  const { addToast } = useToast();
+  const { toast } = useToast()  // Use the hook
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isInterviewStarted, setIsInterviewStarted] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -67,7 +67,7 @@ export default function MockInterviewModal({ onClose, onComplete, questionSetId 
     } catch (err) {
       console.error("Camera initialization error:", err);
       setError("Failed to access webcam. Please check permissions.");
-      addToast({
+      toast({
         title: "Camera Error",
         description: "Failed to access webcam. Please check permissions."
       });
@@ -174,7 +174,7 @@ export default function MockInterviewModal({ onClose, onComplete, questionSetId 
         setIsInterviewStarted(false);
         setStartTime(null);
   
-        addToast({
+        toast({
           title: "Interview Completed",
           description: "Your mock interview has been saved."
         });
@@ -187,7 +187,7 @@ export default function MockInterviewModal({ onClose, onComplete, questionSetId 
       console.log("Recording started at:", new Date().toISOString());
     } catch (err) {
       console.error("Error starting recording:", err);
-      addToast({
+      toast({
         title: "Recording Error",
         description: "Failed to start recording. Please try again."
       });

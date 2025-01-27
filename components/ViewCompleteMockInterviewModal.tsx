@@ -2,7 +2,7 @@ import React from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { X, Download } from "lucide-react"
-import { useToast } from "@/components/ui/toast"
+import { useToast } from "@/hooks/use-toast"  // Update this import
 
 interface ViewCompleteMockInterviewModalProps {
   onClose: () => void
@@ -10,7 +10,7 @@ interface ViewCompleteMockInterviewModalProps {
 }
 
 export default function ViewCompleteMockInterviewModal({ onClose, videoUrl }: ViewCompleteMockInterviewModalProps) {
-  const { addToast } = useToast()
+  const { toast } = useToast()
 
   const handleDownload = () => {
     try {
@@ -24,13 +24,13 @@ export default function ViewCompleteMockInterviewModal({ onClose, videoUrl }: Vi
       link.click();
       document.body.removeChild(link);
 
-      addToast({
+      toast({
         title: "Download Started",
         description: "Your interview video is being downloaded."
       });
     } catch (error) {
       console.error("Download error:", error);
-      addToast({
+      toast({
         title: "Download Failed",
         description: "Failed to download the video. Please try again."
       });

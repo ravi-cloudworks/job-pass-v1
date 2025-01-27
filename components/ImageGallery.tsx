@@ -9,7 +9,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import MockInterviewModal from "./MockInterviewModal"
 import ViewCompleteMockInterviewModal from "./ViewCompleteMockInterviewModal"
 
-import { toast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"  // Update this import
+
 
 interface ImageData {
   url: string

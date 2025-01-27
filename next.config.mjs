@@ -1,8 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  basePath: "/job-pass-v1",
-  output: "export",
-  reactStrictMode: true,
+  output: 'export',
+  basePath: '/job-pass-v1',
 };
 
-module.exports = nextConfig;
+export default nextConfig
