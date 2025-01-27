@@ -4,12 +4,10 @@
   "private": true,
   "homepage": "https://ravi-cloudworks.github.io/job-pass-v1",
   "scripts": {
-    "dev": "next dev",
+    "start": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
+    "deploy": "touch out/.nojekyll && gh-pages -d out -t true"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -49,7 +47,7 @@
     "framer-motion": "latest",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
-    "next": "14.2.16",
+    "next": "^14.2.23",
     "next-themes": "latest",
     "react": "^18",
     "react-day-picker": "8.10.1",
@@ -57,18 +55,22 @@
     "react-hook-form": "^7.54.1",
     "react-markdown": "latest",
     "react-resizable-panels": "^2.1.7",
+    "react-scripts": "^3.0.1",
     "recharts": "2.15.0",
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.6",
-    "zod": "^3.24.1",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "zod": "^3.24.1"
   },
   "browserslist": {
-    "production": ["last 1 chrome version"],
-    "development": ["last 1 chrome version"]
+    "production": [
+      "last 1 chrome version"
+    ],
+    "development": [
+      "last 1 chrome version"
+    ]
   },
   "devDependencies": {
     "@types/node": "^22",
