@@ -13,20 +13,19 @@ interface ImageData {
   isCompleted: boolean
   videoUrl?: string
   questionSetId?: string
+  complexity: 'Easy' | 'Medium' | 'Hard'
+  category: string
 }
 
 export default function ChatPage() {
   const [images, setImages] = useState<ImageData[]>([])
   const [filter, setFilter] = useState<string>("all")
-  const { toast } = useToast()  // Use the hook
+  const { toast } = useToast()
 
-  // console.log("Chatbot flow loaded:", chatbotFlow)
-
-  const addImage = async (prompt: string, questionSetId?: string) => {
-    console.log("Adding image with prompt:", prompt, "questionSetId:", questionSetId)
+  const addImage = async (prompt: string, questionSetId?: string, complexity?: string, category?: string) => {
+    console.log("Adding image with prompt:", prompt, "questionSetId:", questionSetId, "complexity:", complexity, "category:", category)
 
     try {
-      // Simulate image generation delay
       await new Promise(resolve => setTimeout(resolve, 3000))
 
       const newImage = `./placeholder.svg?height=300&width=300&text=${encodeURIComponent(prompt)}`
@@ -40,7 +39,9 @@ export default function ChatPage() {
         createdAt: new Date(),
         isFavorite: false,
         isCompleted: false,
-        questionSetId: questionSetId
+        questionSetId: questionSetId,
+        complexity: (complexity as 'Easy' | 'Medium' | 'Hard') || 'Easy',
+        category: category || 'General Interview'
       }
 
       setImages(prev => [...prev, newImageData])
@@ -102,14 +103,17 @@ export default function ChatPage() {
 
   return (
     <div className="container mx-auto px-2 py-4 h-[calc(100vh-4rem)] flex flex-col">
-      {/* <h1 className="text-2xl font-bold mb-4">AI Image Chat</h1> */}
       <div className="flex-1 grid grid-cols-10 gap-4 overflow-hidden">
         <div className="col-span-4 border rounded-lg overflow-hidden">
           <Chat
             onSendMessage={console.log}
-            onGenerateImage={(prompt, questionSetId) => {
-              console.log("Generating image with questionSetId:", questionSetId)
-              return addImage(prompt, questionSetId)
+            onGenerateImage={(prompt, questionSetId, complexity, category) => {
+              console.log("Generating image with:", {
+                questionSetId,
+                complexity,
+                category
+              })
+              return addImage(prompt, questionSetId, complexity, category)
             }}
           />
         </div>

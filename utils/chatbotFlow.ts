@@ -4,6 +4,7 @@ export interface ChatbotNode {
   question: string
   options?: string[]
   text?: string
+  parent?: string  // Add parent property
   isEndpoint?: boolean
   questionSetId?: {
     [key: string]: {
@@ -33,7 +34,7 @@ export function getNode(key: string): ChatbotNode {
     if (option) {
       return {
         question: `You selected ${option.text}. What complexity level do you prefer?`,
-        options: ["Easy", "Medium", "Strong"],
+        options: ["Easy", "Medium", "Hard"],
         isEndpoint: true,
         text: option.text,
       }
@@ -50,14 +51,18 @@ export function getNode(key: string): ChatbotNode {
   }
 }
 
-export function getOptionText(key: string): string {
-  if (chatbotFlow.options[key]) {
-    return chatbotFlow.options[key].text
+
+export function getOptionText(option: string): string {
+  // Special cases
+  if (option === "start_over") {
+    return "Start Over Again"
   }
-  if (chatbotFlow.nodes[key]) {
-    return chatbotFlow.nodes[key].text || key
-  }
-  return key
+
+  // For other options, replace underscores with spaces and capitalize first letter
+  return option
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
 }
 
 export function getQuestionSetId(node: ChatbotNode, complexity: string): string | undefined {

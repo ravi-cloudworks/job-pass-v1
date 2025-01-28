@@ -2,11 +2,33 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Bot, User, Wallet } from "lucide-react"
+import { Bot, User, Clock } from "lucide-react"
 import { Alert, AlertTitle } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import QRCodeViewer from "./QRCodeViewer"
 import { motion, AnimatePresence } from "framer-motion"
 import { getNode, getOptionText, getQuestionSetId, type ChatbotNode } from "@/utils/chatbotFlow"
+
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  AlertDialogAction,
+  AlertDialogCancel,
+
+} from "@/components/ui/alert-dialog"
+import {  AlertDescription } from "@/components/ui/alert"
+import { Label } from "@/components/ui/label"
 
 interface ChatMessage {
   role: "ai" | "user";
@@ -17,23 +39,33 @@ interface ChatMessage {
     amount: number;
     paymentUrl: string;
   };
-  imageUrl?: string;
+  complexity?: string;
+  category?: string;
   questionSetId?: string;
 }
 
-
 interface ChatProps {
-  onSendMessage: (message: string) => void
-  onGenerateImage: (prompt: string, questionSetId: string | undefined) => Promise<string>
+  onSendMessage: (message: string) => void;
+  onGenerateImage: (prompt: string, questionSetId: string | undefined, complexity: string, category: string) => Promise<string>;
 }
+
+const COMPLEXITY_MINUTES = {
+  Easy: 15,
+  Medium: 30,
+  Strong: 45
+}
+
+
 
 export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [currentNode, setCurrentNode] = useState<ChatbotNode>(getNode("root"))
   const [isAiThinking, setIsAiThinking] = useState(false)
   const [selectedQR, setSelectedQR] = useState<string | null>(null)
-  const [credits, setCredits] = useState(3) // Start with 3 credits for testing
+  const [remainingMinutes, setRemainingMinutes] = useState(120) // 2 hours in minutes
   const [complexity, setComplexity] = useState<string | null>(null)
+  const [showConfirmation, setShowConfirmation] = useState(false)
+  const [pendingComplexity, setPendingComplexity] = useState<string | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -45,7 +77,7 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
         options: [...(currentNode.options || []), "start_over"],
       },
     ])
-  }, [currentNode, currentNode.question, currentNode.options]) // Added currentNode.question to dependencies
+  }, [currentNode])
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -53,7 +85,7 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
 
   useEffect(() => {
     scrollToBottom()
-  }, [chatHistory, chatEndRef]) // Added chatEndRef to dependencies
+  }, [chatHistory])
 
   const handleOptionClick = async (option: string) => {
     if (option === "start_over") {
@@ -72,20 +104,6 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
     const newUserMessage: ChatMessage = { role: "user", content: getOptionText(option) }
     setChatHistory((prev) => [...prev, newUserMessage])
 
-    if (credits <= 0) {
-      const paymentMessage: ChatMessage = {
-        role: "ai",
-        type: "qr-payment",
-        content: "Insufficient credits. Please scan the QR code to add more credits.",
-        qrData: {
-          amount: 10,
-          paymentUrl: "./placeholder.svg?height=200&width=200&text=Sample+QR+Code",
-        },
-      }
-      setChatHistory((prev) => [...prev, paymentMessage])
-      return
-    }
-
     setIsAiThinking(true)
     onSendMessage(option)
 
@@ -102,72 +120,104 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
     setIsAiThinking(false)
   }
 
-  const handleComplexitySelection = async (selectedComplexity: string) => {
-    setComplexity(selectedComplexity);
-    const complexityMessage: ChatMessage = { role: "user", content: selectedComplexity };
-    setChatHistory(prev => [...prev, complexityMessage]);
-  
-    if (credits <= 0) {
+  const handleComplexitySelection = (selectedComplexity: string) => {
+    const requiredMinutes = COMPLEXITY_MINUTES[selectedComplexity as keyof typeof COMPLEXITY_MINUTES]
+
+    if (remainingMinutes < requiredMinutes) {
       const paymentMessage: ChatMessage = {
         role: "ai",
         type: "qr-payment",
-        content: "Insufficient credits. Please scan the QR code to add more credits.",
+        content: "Insufficient minutes remaining. Please purchase more time to continue.",
         qrData: {
           amount: 10,
           paymentUrl: "./placeholder.svg?height=200&width=200&text=Sample+QR+Code",
         },
-      };
-      setChatHistory(prev => [...prev, paymentMessage]);
-      return;
+      }
+      setChatHistory(prev => [...prev, paymentMessage])
+      return
     }
-  
-    setCredits(prev => prev - 1);
-    setIsAiThinking(true);
+
+    setPendingComplexity(selectedComplexity)
+    setShowConfirmation(true)
+  }
+
+  const handleConfirmation = async (confirmed: boolean) => {
+    setShowConfirmation(false)
+    
+    if (!confirmed || !pendingComplexity) {
+      return
+    }
+
+    const requiredMinutes = COMPLEXITY_MINUTES[pendingComplexity as keyof typeof COMPLEXITY_MINUTES]
+    const complexityMessage: ChatMessage = { role: "user", content: pendingComplexity }
+    setChatHistory(prev => [...prev, complexityMessage])
+    
+    setRemainingMinutes(prev => prev - requiredMinutes)
+    setComplexity(pendingComplexity)
+    setIsAiThinking(true)
     
     try {
-      console.log('Current node:', currentNode);
-      const questionSetId = getQuestionSetId(currentNode, selectedComplexity);
-      console.log('Retrieved questionSetId:', questionSetId);
+      const questionSetId = getQuestionSetId(currentNode, pendingComplexity)
       
       if (!questionSetId) {
-        console.log('No question set ID found for:', {
-          nodeText: currentNode.text,
-          complexity: selectedComplexity
-        });
-        throw new Error("No valid question set found for the selected complexity");
+        throw new Error("No valid question set found for the selected complexity")
       }
       
-      const prompt = `${currentNode.text || ""} - ${selectedComplexity}`;
-      const imageUrl = await onGenerateImage(prompt, questionSetId);
+      // Build the full category path
+      let categoryPath = currentNode.text || ""
+      let currentParent = currentNode.parent
+      while (currentParent) {
+        const parentNode = getNode(currentParent)
+        if (parentNode.text) {
+          categoryPath = `${parentNode.text} > ${categoryPath}`
+        }
+        currentParent = parentNode.parent
+      }
       
-      setIsAiThinking(false);
+      const prompt = `${categoryPath} - ${pendingComplexity}`
+      
+      // Wait for animation steps to complete (40 seconds total)
+      await new Promise(resolve => setTimeout(resolve, 40000));
+      
+      // Only start image generation after animation completes
+      const imageUrl = await onGenerateImage(prompt, questionSetId, pendingComplexity, categoryPath)
+      
+      setIsAiThinking(false)
       const aiResponse: ChatMessage = {
         role: "ai",
         type: "image-generation",
-        content: `I've generated an image based on "${prompt}". You can see it in the gallery on the right.`,
+        content: `Your AI interview for ${categoryPath} with ${pendingComplexity} complexity has been generated successfully! You can find it in the gallery.`,
         options: ["start_over"],
-        imageUrl: imageUrl,
         questionSetId: questionSetId,
-      };
-      setChatHistory(prev => [...prev, aiResponse]);
+        complexity: pendingComplexity,
+        category: categoryPath
+      }
+      setChatHistory(prev => [...prev, aiResponse])
     } catch (error) {
-      console.error("Error in handleComplexitySelection:", error);
-      setIsAiThinking(false);
+      console.error("Error in handleComplexitySelection:", error)
+      setIsAiThinking(false)
       const errorMessage: ChatMessage = {
         role: "ai",
         content: "I'm sorry, there was an error generating AI Interview. Please try again.",
         options: ["start_over"],
-      };
-      setChatHistory(prev => [...prev, errorMessage]);
+      }
+      setChatHistory(prev => [...prev, errorMessage])
     }
-  };
+  }
+
+  
+  const formatMinutes = (minutes: number) => {
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    return `${hours}h ${mins}m`
+  }
 
   return (
     <div className="flex flex-col h-full">
       <div className="p-2 border-b">
         <Alert>
-          <Wallet className="h-4 w-4" />
-          <AlertTitle className="text-sm">Credits: {credits}</AlertTitle>
+          <Clock className="h-4 w-4" />
+          <AlertTitle className="text-sm">Time Remaining: {formatMinutes(remainingMinutes)}</AlertTitle>
         </Alert>
       </div>
       <ScrollArea className="flex-1 p-2">
@@ -202,15 +252,7 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
                       <p className="text-sm text-center mt-2">Click to enlarge QR code</p>
                     </div>
                   )}
-                  {msg.type === "image-generation" && msg.imageUrl && (
-                    <div className="mt-2">
-                      <img
-                        src={msg.imageUrl || "./placeholder.svg"}
-                        alt="Generated Image"
-                        className="w-full h-auto rounded-lg"
-                      />
-                    </div>
-                  )}
+
                   {msg.options && (
                     <div className="mt-2 space-y-2">
                       {msg.options.map((option, i) => (
@@ -220,7 +262,7 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
                           size="sm"
                           className="w-full text-left justify-start"
                           onClick={() =>
-                            option === "Easy" || option === "Medium" || option === "Strong"
+                            option === "Easy" || option === "Medium" || option === "Hard"
                               ? handleComplexitySelection(option)
                               : handleOptionClick(option)
                           }
@@ -252,26 +294,113 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
         <div ref={chatEndRef} />
       </ScrollArea>
       {selectedQR && <QRCodeViewer qrUrl={selectedQR} onClose={() => setSelectedQR(null)} />}
+
+      <AlertDialog open={showConfirmation} onOpenChange={setShowConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Interview Generation</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <p className="font-medium mb-2">Selected Interview Details:</p>
+                <div className="space-y-2">
+                  <p><span className="text-gray-600">Category:</span> {currentNode.text}</p>
+                  <p><span className="text-gray-600">Complexity:</span> {pendingComplexity}</p>
+                  <p><span className="text-gray-600">Duration:</span> {COMPLEXITY_MINUTES[pendingComplexity as keyof typeof COMPLEXITY_MINUTES]} minutes</p>
+                </div>
+              </div>
+              <p className="text-yellow-600">
+                ⚠️ This action will deduct {COMPLEXITY_MINUTES[pendingComplexity as keyof typeof COMPLEXITY_MINUTES]} minutes
+                from your remaining time and cannot be reversed.
+              </p>
+              <p className="font-medium">Do you want to proceed?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => handleConfirmation(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => handleConfirmation(true)}
+              className="bg-blue-500 hover:bg-blue-600 text-white"
+            >
+              Generate Interview
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
 
 function ThinkingAnimation() {
-  const [dots, setDots] = useState("")
+  const [currentStep, setCurrentStep] = useState(0);
+  const [dots, setDots] = useState("");
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [startTime] = useState(Date.now());
+
+  const steps = [
+    "AI is generating",
+    "Generating your questions",
+    "Generating your video infrastructure",
+    "Finalizing your interview"
+  ];
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setDots((prev) => (prev.length >= 3 ? "" : prev + "."))
-    }, 500)
+    // Dots animation
+    const dotsInterval = setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+    }, 500);
 
-    return () => clearInterval(interval)
-  }, [])
+    // Step progression based on elapsed time
+    const progressionInterval = setInterval(() => {
+      const elapsedTime = Date.now() - startTime;
+      const stepDuration = 10000; // 10 seconds per step
+
+      const currentStepIndex = Math.min(
+        Math.floor(elapsedTime / stepDuration),
+        steps.length - 1
+      );
+
+      setCurrentStep(currentStepIndex);
+
+      // Update completed steps
+      const newCompletedSteps = [];
+      for (let i = 0; i < currentStepIndex; i++) {
+        newCompletedSteps.push(i);
+      }
+      setCompletedSteps(newCompletedSteps);
+
+    }, 100); // Check progress every 100ms for smooth updates
+
+    return () => {
+      clearInterval(dotsInterval);
+      clearInterval(progressionInterval);
+    };
+  }, [startTime]); // Only depend on startTime
 
   return (
-    <div className="flex items-center space-x-1">
-      <span>AI is generating  </span>
-      <span className="w-8 text-left">{dots}</span>
+    <div className="space-y-3 p-2">
+      {steps.map((step, index) => (
+        <div key={index} className="flex items-center space-x-3 min-h-[2rem]">
+          <div className="w-6 flex justify-center">
+            {completedSteps.includes(index) ? (
+              <span className="text-green-500 text-lg animate-fade-in">✓</span>
+            ) : currentStep === index ? (
+              <span className="w-4 text-blue-500">{dots}</span>
+            ) : (
+              <span className="w-4"></span>
+            )}
+          </div>
+          <span className={`transition-colors duration-300 ${completedSteps.includes(index)
+              ? 'text-green-500 font-medium'
+              : currentStep === index
+                ? 'text-blue-500'
+                : 'text-gray-400'
+            }`}>
+            {step}
+          </span>
+        </div>
+      ))}
     </div>
-  )
+  );
 }
-
