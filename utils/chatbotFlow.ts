@@ -33,7 +33,7 @@ export function getNode(key: string): ChatbotNode {
     if (option) {
       return {
         question: `You selected ${option.text}. What complexity level do you prefer?`,
-        options: ["Easy", "Medium", "Hard"],
+        options: ["Easy", "Medium", "Strong"],
         isEndpoint: true,
         text: option.text,
       }
@@ -61,25 +61,55 @@ export function getOptionText(key: string): string {
 }
 
 export function getQuestionSetId(node: ChatbotNode, complexity: string): string | undefined {
-  console.log("Node in getQuestionSetId:", node);
-  console.log("Complexity:", complexity);
+  console.log('Getting question set ID for:', {
+    nodeText: node.text,
+    complexity: complexity,
+    hasQuestionSetId: !!node.questionSetId
+  });
 
-  // Find parent node that contains questionSetId
-  if (node.text === "Python + Django") {
-    const backendNode = chatbotFlow.nodes["backend_dev"];
-    if (backendNode?.questionSetId?.python_django?.standard) {
-      return backendNode.questionSetId.python_django.standard[complexity.toLowerCase()]?.[0];
+  // Early return if no node or complexity
+  if (!node || !complexity) {
+    console.log('No node or complexity provided');
+    return undefined;
+  }
+
+  // Check if we're dealing with an option node (from getNode function)
+  if (node.question?.includes('You selected') && node.text) {
+    // Find the corresponding parent node from chatbotFlow
+    const parentNodeEntry = Object.entries(chatbotFlow.nodes).find(([_, parentNode]) => {
+      return parentNode.options?.some(option => {
+        const optionText = chatbotFlow.options[option]?.text;
+        return optionText === node.text;
+      });
+    });
+
+    if (parentNodeEntry) {
+      const [parentNodeKey, parentNode] = parentNodeEntry;
+      console.log('Found parent node:', parentNodeKey, parentNode);
+
+      // Get the option key that matches our text
+      const optionKey = parentNode.options?.find(option => 
+        chatbotFlow.options[option]?.text === node.text
+      );
+
+      if (optionKey && parentNode.questionSetId?.[optionKey]?.standard) {
+        const questionSetId = parentNode.questionSetId[optionKey].standard[complexity.toLowerCase()]?.[0];
+        console.log('Found question set ID:', questionSetId);
+        return questionSetId;
+      }
     }
   }
 
-  // Original logic for other cases
-  if (node?.questionSetId && node.text) {
-    const questionSet = node.questionSetId[node.text.toLowerCase()];
-    if (questionSet?.standard) {
-      return questionSet.standard[complexity.toLowerCase()]?.[0];
+  // Check direct node questionSetId if it exists
+  if (node.questionSetId && node.text) {
+    const key = Object.keys(node.questionSetId)[0];
+    if (key) {
+      const questionSetId = node.questionSetId[key].standard[complexity.toLowerCase()]?.[0];
+      console.log('Found direct question set ID:', questionSetId);
+      return questionSetId;
     }
   }
 
+  console.log('No question set ID found');
   return undefined;
 }
-

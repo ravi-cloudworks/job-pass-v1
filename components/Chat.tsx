@@ -103,57 +103,64 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
   }
 
   const handleComplexitySelection = async (selectedComplexity: string) => {
-  setComplexity(selectedComplexity);
-  const complexityMessage: ChatMessage = { role: "user", content: selectedComplexity };
-  setChatHistory(prev => [...prev, complexityMessage]);
-
-  if (credits <= 0) {
-    const paymentMessage: ChatMessage = {
-      role: "ai",
-      type: "qr-payment",
-      content: "Insufficient credits. Please scan the QR code to add more credits.",
-      qrData: {
-        amount: 10,
-        paymentUrl: "./placeholder.svg?height=200&width=200&text=Sample+QR+Code",
-      },
-    };
-    setChatHistory(prev => [...prev, paymentMessage]);
-    return;
-  }
-
-  setCredits(prev => prev - 1);
-  setIsAiThinking(true);
+    setComplexity(selectedComplexity);
+    const complexityMessage: ChatMessage = { role: "user", content: selectedComplexity };
+    setChatHistory(prev => [...prev, complexityMessage]);
   
-  try {
-    const questionSetId = getQuestionSetId(currentNode, selectedComplexity);
-    if (!questionSetId) {
-      throw new Error("No valid question set found for the selected complexity");
+    if (credits <= 0) {
+      const paymentMessage: ChatMessage = {
+        role: "ai",
+        type: "qr-payment",
+        content: "Insufficient credits. Please scan the QR code to add more credits.",
+        qrData: {
+          amount: 10,
+          paymentUrl: "./placeholder.svg?height=200&width=200&text=Sample+QR+Code",
+        },
+      };
+      setChatHistory(prev => [...prev, paymentMessage]);
+      return;
     }
+  
+    setCredits(prev => prev - 1);
+    setIsAiThinking(true);
     
-    const prompt = `${currentNode.text || ""} - ${selectedComplexity}`;
-    const imageUrl = await onGenerateImage(prompt, questionSetId);
-    
-    setIsAiThinking(false);
-    const aiResponse: ChatMessage = {
-      role: "ai",
-      type: "image-generation",
-      content: `I've generated an image based on "${prompt}". You can see it in the gallery on the right.`,
-      options: ["start_over"],
-      imageUrl: imageUrl,
-      questionSetId: questionSetId,
-    };
-    setChatHistory(prev => [...prev, aiResponse]);
-  } catch (error) {
-    console.error("Error in handleComplexitySelection:", error);
-    setIsAiThinking(false);
-    const errorMessage: ChatMessage = {
-      role: "ai",
-      content: "I'm sorry, there was an error generating AI Interview. Please try again.",
-      options: ["start_over"],
-    };
-    setChatHistory(prev => [...prev, errorMessage]);
-  }
-};
+    try {
+      console.log('Current node:', currentNode);
+      const questionSetId = getQuestionSetId(currentNode, selectedComplexity);
+      console.log('Retrieved questionSetId:', questionSetId);
+      
+      if (!questionSetId) {
+        console.log('No question set ID found for:', {
+          nodeText: currentNode.text,
+          complexity: selectedComplexity
+        });
+        throw new Error("No valid question set found for the selected complexity");
+      }
+      
+      const prompt = `${currentNode.text || ""} - ${selectedComplexity}`;
+      const imageUrl = await onGenerateImage(prompt, questionSetId);
+      
+      setIsAiThinking(false);
+      const aiResponse: ChatMessage = {
+        role: "ai",
+        type: "image-generation",
+        content: `I've generated an image based on "${prompt}". You can see it in the gallery on the right.`,
+        options: ["start_over"],
+        imageUrl: imageUrl,
+        questionSetId: questionSetId,
+      };
+      setChatHistory(prev => [...prev, aiResponse]);
+    } catch (error) {
+      console.error("Error in handleComplexitySelection:", error);
+      setIsAiThinking(false);
+      const errorMessage: ChatMessage = {
+        role: "ai",
+        content: "I'm sorry, there was an error generating AI Interview. Please try again.",
+        options: ["start_over"],
+      };
+      setChatHistory(prev => [...prev, errorMessage]);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -181,9 +188,8 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
                   </AvatarFallback>
                 </Avatar>
                 <div
-                  className={`p-3 rounded-lg ${
-                    msg.role === "user" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-800"
-                  }`}
+                  className={`p-3 rounded-lg ${msg.role === "user" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-800"
+                    }`}
                 >
                   <p>{msg.content}</p>
                   {msg.type === "qr-payment" && msg.qrData && (

@@ -1,67 +1,67 @@
 {
-    "id": "SIQU-001",
-    "title": "# Entry Level HR Interview\n## Situational Questions - Basic Scenarios",
-    "time_limit": 1800,
-    "questions": [
-      {
-        "id": "q1",
-        "question": "### Project Deadline Scenario 🕒\n\n**Situation:** You're working on a team project that's due in two days, and you notice that one of your team members is struggling with their part, which could delay the entire project.\n\n**Please walk us through how you would handle this situation. Consider the following aspects:**\n\n*\n 🎯 Your **immediate actions** and first steps\n*\n 💬 How you would *approach and communicate* with the struggling team member\n*\n 📋 Your strategy to ensure project completion while maintaining team harmony\n*\n 🔄 Preventive measures to avoid similar situations in future projects"
-      },
-      {
-        "id": "q2",
-        "question": "### Time Management Challenge ⏰\n\n**Scenario Context:**\n\nYou arrive at work on a busy Monday morning and face these ___urgent___ tasks:\n*\n 📧 An urgent client email requiring immediate response\n*\n 👥 A scheduled team meeting starting in 10 minutes\n*\n 📊 An overdue report your manager requested yesterday\n\n**Share your approach to this situation, addressing:**\n\n*\n How you would **prioritize** these competing demands\n*\n Your *reasoning and decision-making process*\n*\n Your strategy for ~~handling everything at once~~ managing tasks effectively"
-      },
-      {
-        "id": "q3",
-        "question": "### Communication Challenge 🗣️\n\n**Context:** During a team presentation, you notice a significant error in the data being presented by a colleague.\n\n**Describe your approach to this delicate situation:**\n\n*\n Your thought process for **timing** the intervention\n*\n How you would *tactfully* address the error\n*\n Ways to maintain __professional relationships__ while ensuring accuracy\n*\n Strategies for preventing similar situations in future presentations"
-      },
-      {
-        "id": "q4",
-        "question": "### Remote Work Adaptation 🏠\n\n**Situation:** You've just joined a fully remote team and are finding it challenging to understand project requirements and team dynamics.\n\n**Walk us through your strategy for success:**\n\n*\n Your approach to **virtual onboarding** and integration\n*\n How you would *build relationships* with remote teammates\n*\n Tools and techniques for ensuring clear communication\n*\n Ways to stay visible and valuable in a remote setting"
-      },
-      {
-        "id": "q5",
-        "question": "### Technology Transition 💻\n\n**Scenario:** Your team is transitioning to a new project management software, but some colleagues are resistant to change.\n\n**Share your perspective on:**\n\n*\n Your personal approach to **embracing new technology**\n*\n Strategies for *supporting resistant colleagues*\n*\n Ways to balance efficiency with team comfort\n*\n Ideas for making the transition smoother for everyone"
-      },
-      {
-        "id": "q6",
-        "question": "### Work-Life Balance Challenge ⚖️\n\n**Context:** Your workload has increased significantly, affecting your personal commitments.\n\n**Explain your approach to:**\n\n*\n **Managing** increased responsibilities\n*\n *Communicating* boundaries professionally\n*\n Maintaining quality while preserving personal time\n*\n Creating sustainable long-term solutions"
-      },
-      {
-        "id": "q7",
-        "question": "### Feedback Reception 📝\n\n**Situation:** You've received detailed constructive criticism about your recent project presentation.\n\n**Share your thoughts on:**\n\n*\n Your **initial reaction** and emotional management\n*\n How you would *process and implement* the feedback\n*\n Steps for turning criticism into improvement\n*\n Ways to follow up and show progress"
-      },
-      {
-        "id": "q8",
-        "question": "### Diverse Team Collaboration 🌍\n\n**Context:** You're working in a team with diverse working styles, cultural backgrounds, and communication preferences.\n\n**Describe your approach to:**\n\n*\n **Adapting** your communication style\n*\n *Leveraging* diversity for better outcomes\n*\n Building inclusive team dynamics\n*\n Learning from different perspectives"
-      },
-      {
-        "id": "q9",
-        "question": "### Resource Constraints 📊\n\n**Scenario:** Midway through a project, you realize you don't have sufficient resources to complete it as planned.\n\n**Detail your approach to:**\n\n*\n **Assessing** the situation objectively\n*\n *Developing* alternative solutions\n*\n Communicating challenges professionally\n*\n Managing stakeholder expectations"
-      },
-      {
-        "id": "q10",
-        "question": "### Client Relations 🤝\n\n**Situation:** A client expresses strong dissatisfaction with a deliverable after business hours.\n\n**Walk us through:**\n\n*\n Your **immediate response** strategy\n*\n How you would *handle the situation* professionally\n*\n Steps to address client concerns effectively\n*\n Ways to prevent similar situations"
-      },
-      {
-        "id": "q11",
-        "question": "### Process Improvement 📈\n\n**Context:** You've discovered a more efficient method for a routine task, but teammates prefer their current approach.\n\n**Share your thoughts on:**\n\n*\n How you would **present** your improvement idea\n*\n Ways to *demonstrate* benefits respectfully\n*\n Strategies for encouraging adoption\n*\n Balancing innovation with team comfort"
-      },
-      {
-        "id": "q12",
-        "question": "### Meeting Preparation 📊\n\n**Scenario:** You need to present tomorrow, but lack complete information from teammates.\n\n**Explain your approach to:**\n\n*\n **Managing** the immediate challenge\n*\n *Gathering* available information effectively\n*\n Preparing a professional presentation\n*\n Following up with missing details"
-      },
-      {
-        "id": "q13",
-        "question": "### Multiple Priorities 🎯\n\n**Context:** Different team leaders have assigned you urgent tasks simultaneously.\n\n**Describe your strategy for:**\n\n*\n **Evaluating** task priorities\n*\n *Managing* stakeholder expectations\n*\n Organizing your workflow efficiently\n*\n Maintaining work quality under pressure"
-      },
-      {
-        "id": "q14",
-        "question": "### Technical Difficulties 🔧\n\n**Situation:** A critical technical issue arises when IT support is unavailable.\n\n**Share your approach to:**\n\n*\n **Immediate problem-solving** steps\n*\n *Alternative solutions* you might explore\n*\n Communication with affected parties\n*\n Learning from the experience"
-      },
-      {
-        "id": "q15",
-        "question": "### Team Engagement 👥\n\n**Context:** Some team members are noticeably quiet during virtual meetings and discussions.\n\n**Explain your strategy for:**\n\n*\n **Encouraging** active participation\n*\n Creating an *inclusive* environment\n*\n Building team confidence\n*\n Maintaining productive discussions"
-      }
-    ]
-  }
+  "id": "SIQU-001",
+  "title": "# Entry Level HR Interview\n## Situational Questions - Basic Scenarios",
+  "time_limit": 1800,
+  "questions": [
+    {
+      "id": "q1",
+      "question": "### Project Deadline Scenario 🕒\n\n**Situation:** You're working on a team project that's due in two days, and you notice that one of your team members is struggling with their part, which could delay the entire project.\n\n**Please walk us through how you would handle this situation. Consider the following aspects:**\n\n*\n 🎯 Your **immediate actions** and first steps\n*\n 💬 How you would *approach and communicate* with the struggling team member\n*\n 📋 Your strategy to ensure project completion while maintaining team harmony\n*\n 🔄 Preventive measures to avoid similar situations in future projects"
+    },
+    {
+      "id": "q2",
+      "question": "### Time Management Challenge ⏰\n\n**Scenario Context:**\n\nYou arrive at work on a busy Monday morning and face these ___urgent___ tasks:\n*\n 📧 An urgent client email requiring immediate response\n*\n 👥 A scheduled team meeting starting in 10 minutes\n*\n 📊 An overdue report your manager requested yesterday\n\n**Share your approach to this situation, addressing:**\n\n*\n How you would **prioritize** these competing demands\n*\n Your *reasoning and decision-making process*\n*\n Your strategy for ~~handling everything at once~~ managing tasks effectively"
+    },
+    {
+      "id": "q3",
+      "question": "### Communication Challenge 🗣️\n\n**Context:** During a team presentation, you notice a significant error in the data being presented by a colleague.\n\n**Describe your approach to this delicate situation:**\n\n*\n Your thought process for **timing** the intervention\n*\n How you would *tactfully* address the error\n*\n Ways to maintain __professional relationships__ while ensuring accuracy\n*\n Strategies for preventing similar situations in future presentations"
+    },
+    {
+      "id": "q4",
+      "question": "### Remote Work Adaptation 🏠\n\n**Situation:** You've just joined a fully remote team and are finding it challenging to understand project requirements and team dynamics.\n\n**Walk us through your strategy for success:**\n\n*\n Your approach to **virtual onboarding** and integration\n*\n How you would *build relationships* with remote teammates\n*\n Tools and techniques for ensuring clear communication\n*\n Ways to stay visible and valuable in a remote setting"
+    },
+    {
+      "id": "q5",
+      "question": "### Technology Transition 💻\n\n**Scenario:** Your team is transitioning to a new project management software, but some colleagues are resistant to change.\n\n**Share your perspective on:**\n\n*\n Your personal approach to **embracing new technology**\n*\n Strategies for *supporting resistant colleagues*\n*\n Ways to balance efficiency with team comfort\n*\n Ideas for making the transition smoother for everyone"
+    },
+    {
+      "id": "q6",
+      "question": "### Work-Life Balance Challenge ⚖️\n\n**Context:** Your workload has increased significantly, affecting your personal commitments.\n\n**Explain your approach to:**\n\n*\n **Managing** increased responsibilities\n*\n *Communicating* boundaries professionally\n*\n Maintaining quality while preserving personal time\n*\n Creating sustainable long-term solutions"
+    },
+    {
+      "id": "q7",
+      "question": "### Feedback Reception 📝\n\n**Situation:** You've received detailed constructive criticism about your recent project presentation.\n\n**Share your thoughts on:**\n\n*\n Your **initial reaction** and emotional management\n*\n How you would *process and implement* the feedback\n*\n Steps for turning criticism into improvement\n*\n Ways to follow up and show progress"
+    },
+    {
+      "id": "q8",
+      "question": "### Diverse Team Collaboration 🌍\n\n**Context:** You're working in a team with diverse working styles, cultural backgrounds, and communication preferences.\n\n**Describe your approach to:**\n\n*\n **Adapting** your communication style\n*\n *Leveraging* diversity for better outcomes\n*\n Building inclusive team dynamics\n*\n Learning from different perspectives"
+    },
+    {
+      "id": "q9",
+      "question": "### Resource Constraints 📊\n\n**Scenario:** Midway through a project, you realize you don't have sufficient resources to complete it as planned.\n\n**Detail your approach to:**\n\n*\n **Assessing** the situation objectively\n*\n *Developing* alternative solutions\n*\n Communicating challenges professionally\n*\n Managing stakeholder expectations"
+    },
+    {
+      "id": "q10",
+      "question": "### Client Relations 🤝\n\n**Situation:** A client expresses strong dissatisfaction with a deliverable after business hours.\n\n**Walk us through:**\n\n*\n Your **immediate response** strategy\n*\n How you would *handle the situation* professionally\n*\n Steps to address client concerns effectively\n*\n Ways to prevent similar situations"
+    },
+    {
+      "id": "q11",
+      "question": "### Process Improvement 📈\n\n**Context:** You've discovered a more efficient method for a routine task, but teammates prefer their current approach.\n\n**Share your thoughts on:**\n\n*\n How you would **present** your improvement idea\n*\n Ways to *demonstrate* benefits respectfully\n*\n Strategies for encouraging adoption\n*\n Balancing innovation with team comfort"
+    },
+    {
+      "id": "q12",
+      "question": "### Meeting Preparation 📊\n\n**Scenario:** You need to present tomorrow, but lack complete information from teammates.\n\n**Explain your approach to:**\n\n*\n **Managing** the immediate challenge\n*\n *Gathering* available information effectively\n*\n Preparing a professional presentation\n*\n Following up with missing details"
+    },
+    {
+      "id": "q13",
+      "question": "### Multiple Priorities 🎯\n\n**Context:** Different team leaders have assigned you urgent tasks simultaneously.\n\n**Describe your strategy for:**\n\n*\n **Evaluating** task priorities\n*\n *Managing* stakeholder expectations\n*\n Organizing your workflow efficiently\n*\n Maintaining work quality under pressure"
+    },
+    {
+      "id": "q14",
+      "question": "### Technical Difficulties 🔧\n\n**Situation:** A critical technical issue arises when IT support is unavailable.\n\n**Share your approach to:**\n\n*\n **Immediate problem-solving** steps\n*\n *Alternative solutions* you might explore\n*\n Communication with affected parties\n*\n Learning from the experience"
+    },
+    {
+      "id": "q15",
+      "question": "### Team Engagement 👥\n\n**Context:** Some team members are noticeably quiet during virtual meetings and discussions.\n\n**Explain your strategy for:**\n\n*\n **Encouraging** active participation\n*\n Creating an *inclusive* environment\n*\n Building team confidence\n*\n Maintaining productive discussions"
+    }
+  ]
+}

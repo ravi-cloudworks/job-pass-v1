@@ -108,6 +108,7 @@ export default function MockInterviewModal({ onClose, onComplete, questionSetId 
     const fetchQuestions = async () => {
       try {
         setIsLoading(true)
+        console.log(`try to get values from ${questionSetId}.json`)
         const response = await fetch(`./data/mock-interviews/${questionSetId}.json`)
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
         
@@ -117,7 +118,7 @@ export default function MockInterviewModal({ onClose, onComplete, questionSetId 
         setTimeLeft(data.time_limit)
       } catch (error) {
         console.error("Error loading questions:", error)
-        setError(`Failed to load interview questions: ${error}`)
+        setError(`Failed to load interview questions: ${error} -> ${questionSetId}.json`)
       } finally {
         setIsLoading(false)
       }
@@ -292,8 +293,8 @@ export default function MockInterviewModal({ onClose, onComplete, questionSetId 
           <div className="col-span-3 space-y-6 border rounded-lg p-6 flex flex-col">
             {!isInterviewStarted ? (
               <div className="flex-grow flex flex-col justify-center items-center text-center">
-                <h3 className="text-2xl font-semibold mb-4">Welcome to Your Mock Interview</h3>
-                <ReactMarkdown className="prose dark:prose-invert mb-6">{title}</ReactMarkdown>
+               
+                <h1><ReactMarkdown className="prose dark:prose-invert mb-6">{title}</ReactMarkdown></h1>
                 <p className="text-lg mb-6">
                   This mock interview will help you prepare for real job interviews. You'll be presented with common
                   interview questions and have a specific time to practice your responses.
