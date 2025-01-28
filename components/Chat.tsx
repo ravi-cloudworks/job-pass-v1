@@ -269,7 +269,7 @@ function ThinkingAnimation() {
 
   return (
     <div className="flex items-center space-x-1">
-      <span>AI is thinking</span>
+      <span>AI is generating  </span>
       <span className="w-8 text-left">{dots}</span>
     </div>
   )
