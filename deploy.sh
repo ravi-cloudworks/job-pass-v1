@@ -6,6 +6,11 @@ set -e
 # Echo commands before executing
 set -x
 
+# Cleanup any existing temp worktree from failed previous runs
+if [ -d "temp" ]; then
+    git worktree remove -f temp 2>/dev/null || rm -rf temp
+fi
+
 # Remove previous build
 rm -rf out
 
@@ -57,10 +62,34 @@ fi
 cd temp
 git add .
 git commit -m "Deploy to gh-pages"
+
+echo "Pushing to gh-pages branch..."
 git push origin gh-pages
 
+
 # Cleanup
+echo ""
+echo "======================================"
+echo "🔨 Cleaning up deployment resources..."
+echo "======================================"
 cd ..
-git worktree remove temp
+git worktree remove -f temp
+
+echo ""
+echo "======================================"
+echo "✅ Deployment completed successfully!"
+echo "======================================"
+
+
+# Improve cleanup at the end
+cleanup() {
+    if [ -d "temp" ]; then
+        cd ..
+        git worktree remove -f temp 2>/dev/null || rm -rf temp
+    fi
+}
+
+# Set up trap to ensure cleanup runs even if script fails
+trap cleanup EXIT
 
 echo "Deployment completed successfully!"

@@ -8,8 +8,6 @@ import ReactMarkdown from "react-markdown"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
 
-import html2canvas from 'html2canvas';
-
 interface MockInterviewModalProps {
   onClose: () => void
   onComplete: (videoUrl: string) => void
@@ -53,7 +51,7 @@ export default function MockInterviewModal({
   const streamRef = useRef<MediaStream | null>(null);
 
   // Add new ref for the content area
-  const contentRef = useRef<HTMLDivElement>(null);
+const contentRef = useRef<HTMLDivElement>(null);
 
   // Initialize camera on mount
   useEffect(() => {
@@ -175,146 +173,109 @@ export default function MockInterviewModal({
         console.error("Content area not found");
         return;
       }
-
+  
+      // Clean up any existing streams
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+  
       // Get webcam and audio stream
       const webcamStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+  
+      // Get screen capture of the content div
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
         video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
+          displaySurface: 'window',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 }
         }
       });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = webcamStream;
-      }
-
-      // Create a canvas to capture the modal content
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const modalContent = contentRef.current;
-
-      // Set exact dimensions without scaling
-      canvas.width = modalContent.offsetWidth;
-      canvas.height = modalContent.offsetHeight;
-
-      // Create a stream from the canvas
-      const canvasStream = canvas.captureStream(30); // 30 FPS
-
-      const images = modalContent.getElementsByTagName('img');
-      await Promise.all(Array.from(images).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          img.onload = resolve;
-          img.onerror = resolve; // Handle failed loads
-        });
-      }));
-
-
-
-
-      // Create animation frame to continuously draw modal content to canvas
-      function drawCanvas() {
-        if (ctx && modalContent) {
-          html2canvas(modalContent, {
-            useCORS: true,
-            allowTaint: true,
-            foreignObjectRendering: true,
-            imageTimeout: 30000,
-            scale: 1,
-            width: modalContent.offsetWidth,
-            height: modalContent.offsetHeight,
-            onclone: (clonedDoc) => {
-              const clonedImages = clonedDoc.getElementsByTagName('img');
-              Array.from(clonedImages).forEach(img => {
-                img.crossOrigin = "anonymous";
-              });
-            }
-          }).then((contentCanvas) => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(contentCanvas, 0, 0);
-          });
-          requestAnimationFrame(drawCanvas);
-        }
-      }
-
-
-
-      drawCanvas();
-
-      // Combine canvas video with webcam audio
+  
+      // Combine streams (video from screen, audio from webcam)
       const tracks = [
-        ...canvasStream.getVideoTracks(),
+        ...displayStream.getVideoTracks(),
         ...webcamStream.getAudioTracks()
       ];
       const combinedStream = new MediaStream(tracks);
-
-      // Setup video preview
+  
+      // Setup video preview (show webcam in preview, but record combined stream)
       if (videoRef.current) {
         videoRef.current.srcObject = webcamStream;
         streamRef.current = combinedStream;
       }
-
+  
       const mediaRecorder = new MediaRecorder(combinedStream, {
         mimeType: 'video/webm;codecs=vp8',
-        videoBitsPerSecond: 3000000
+        videoBitsPerSecond: 3000000 // Higher bitrate for UI clarity
       });
-
-      // Rest of your existing mediaRecorder setup...
+  
       mediaRecorderRef.current = mediaRecorder;
       const chunks: Blob[] = [];
-
+  
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunks.push(event.data);
         }
       };
-
+  
       mediaRecorder.onstop = () => {
-        // Stop all tracks
+        // Stop all tracks from both streams
         webcamStream.getTracks().forEach(track => {
           track.stop();
           console.log(`Stopped webcam track: ${track.kind}`);
         });
-        canvasStream.getTracks().forEach(track => track.stop());
-
+  
+        displayStream.getTracks().forEach(track => {
+          track.stop();
+          console.log(`Stopped display track: ${track.kind}`);
+        });
+  
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
           streamRef.current = null;
         }
-
+  
+        // Create final video
         const blob = new Blob(chunks, { type: 'video/webm' });
         const videoUrl = URL.createObjectURL(blob);
-
+  
+        // Update states
         setIsInterviewStarted(false);
         setStartTime(null);
         setIsStreaming(false);
-
+  
+        // Clean up video preview
         if (videoRef.current) {
           videoRef.current.srcObject = null;
         }
-
+  
         toast({
           title: "Interview Completed",
           description: "Your mock interview recording has been saved."
         });
-
+  
         onComplete(videoUrl);
       };
-
+  
+      // Start recording
       mediaRecorder.start(1000);
       setStartTime(Date.now());
-
+      
+      toast({
+        title: "Recording Started",
+        description: "Recording both screen and camera. Complete interview when ready."
+      });
+  
     } catch (err) {
       console.error("Recording error:", err);
       stopWebcam();
       toast({
         title: "Recording Error",
-        description: "Failed to start recording. Please check permissions."
+        description: "Failed to start recording. Please grant screen and camera permissions."
       });
     }
   };
@@ -386,7 +347,7 @@ export default function MockInterviewModal({
     }
   }, [isInterviewStarted]);
 
-
+ 
 
   // ... Rest of your existing JSX code remains the same ...
 
@@ -501,8 +462,7 @@ export default function MockInterviewModal({
                 ref={videoRef}
                 autoPlay
                 playsInline
-                muted // Add this to prevent feedback
-                className="w-full h-full object-contain" // Changed from object-cover
+                className="w-full h-full object-cover"
                 style={{ transform: 'scaleX(-1)' }}
               />
               {!isStreaming && (

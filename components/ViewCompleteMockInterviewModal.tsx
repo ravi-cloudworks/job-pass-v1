@@ -1,142 +1,159 @@
-import React from "react"
-import { motion } from "framer-motion"
-import { Button } from "@/components/ui/button"
-import { X, Download, Share2 } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import React, { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import EnhancedVideoPlayer from './EnhancedVideoPlayer';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile } from '@ffmpeg/util';
+
+// FFmpeg CDN URLs
+const FFMPEG_CORE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/umd/ffmpeg-core.js';
+const FFMPEG_WASM_URL = 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/umd/ffmpeg-core.wasm';
 
 interface ViewCompleteMockInterviewModalProps {
-  onClose: () => void
-  videoUrl: string
-  category?: string
-  complexity?: string
+  onClose: () => void;
+  videoUrl: string;
+  category?: string;
+  complexity?: string;
 }
 
-export default function ViewCompleteMockInterviewModal({ 
-  onClose, 
+export default function ViewCompleteMockInterviewModal({
+  onClose,
   videoUrl,
   category,
-  complexity 
+  complexity,
 }: ViewCompleteMockInterviewModalProps) {
-  const { toast } = useToast()
+  const { toast } = useToast();
+  const [ffmpeg, setFFmpeg] = useState<FFmpeg | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  const handleDownload = () => {
+  // Initialize FFmpeg
+  useEffect(() => {
+    const loadFFmpeg = async () => {
+      try {
+        const ffmpegInstance = new FFmpeg();
+        
+        // Set up progress logger
+        ffmpegInstance.on('log', ({ message }) => {
+          // Log messages contain progress information
+          if (message.includes('FFMPEG_END')) {
+            toast({
+              title: 'FFmpeg Loaded',
+              description: 'Video processor is ready.',
+              duration: 2000,
+            });
+          }
+        });
+
+        ffmpegInstance.on('progress', ({ progress: progressVal }) => {
+          setProgress(Math.round(progressVal * 100));
+        });
+
+        // Load FFmpeg with CDN URLs
+        await ffmpegInstance.load({
+          coreURL: FFMPEG_CORE_URL,
+          wasmURL: FFMPEG_WASM_URL
+        });
+        
+        setFFmpeg(ffmpegInstance);
+      } catch (error) {
+        console.error('Error loading FFmpeg:', error);
+        toast({
+          title: 'Video Processing Unavailable',
+          description: 'Failed to load video processor. Please try again later.',
+          duration: 4000,
+        });
+      }
+    };
+
+    loadFFmpeg();
+
+    // Cleanup function
+    return () => {
+      if (ffmpeg) {
+        ffmpeg.terminate();
+      }
+    };
+  }, []);
+
+  const handleDownload = async () => {
+    if (!ffmpeg) {
+      toast({
+        title: "Error",
+        description: "Video processing is not available. Please try again later.",
+      });
+      return;
+    }
+
     try {
+      setProcessing(true);
+      setProgress(0);
+
+      toast({
+        title: "Processing Started",
+        description: "Converting your video to MP4. Please wait...",
+        duration: 5000,
+      });
+
+      // Fetch and process the video
+      const videoData = await fetchFile(videoUrl);
+      await ffmpeg.writeFile('input.webm', videoData);
+
+      // Convert to MP4 with high quality settings
+      await ffmpeg.exec([
+        '-i', 'input.webm',
+        '-c:v', 'libx264',
+        '-preset', 'medium',
+        '-crf', '23',
+        '-c:a', 'aac',
+        '-strict', 'experimental',
+        '-b:a', '128k',
+        '-movflags', '+faststart',
+        'output.mp4'
+      ]);
+
+      // Read the output file
+      const data = await ffmpeg.readFile('output.mp4');
+      const blob = new Blob([data], { type: 'video/mp4' });
+      const url = URL.createObjectURL(blob);
+
+      // Trigger download
       const link = document.createElement('a');
-      link.href = videoUrl;
-      link.download = `mock-interview-${Date.now()}.webm`;
+      link.href = url;
+      link.download = `interview-${Date.now()}.mp4`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      // Cleanup
+      await ffmpeg.deleteFile('input.webm');
+      await ffmpeg.deleteFile('output.mp4');
 
       toast({
-        title: "Download Started",
-        description: "Your interview video is being downloaded."
+        title: "Download Complete",
+        description: "Your video has been converted and saved as MP4.",
       });
     } catch (error) {
-      console.error("Download error:", error);
+      console.error('Processing error:', error);
       toast({
-        title: "Download Failed",
-        description: "Failed to download the video. Please try again."
+        title: "Processing Failed",
+        description: "There was an error processing your video. Please try again.",
       });
-    }
-  }
-
-  const handleShare = async () => {
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: 'Mock Interview Recording',
-          text: 'Check out my mock interview recording',
-          url: videoUrl
-        });
-      } else {
-        // Fallback - copy to clipboard
-        await navigator.clipboard.writeText(videoUrl);
-        toast({
-          title: "Link Copied",
-          description: "Video link copied to clipboard"
-        });
-      }
-    } catch (error) {
-      console.error("Share error:", error);
-      toast({
-        title: "Share Failed",
-        description: "Unable to share the video"
-      });
+    } finally {
+      setProcessing(false);
+      setProgress(0);
     }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center"
-    >
-      <div className="bg-background p-6 rounded-lg shadow-lg w-[85vw] h-[85vh] flex flex-col">
-        {/* Header */}
-        <div className="flex flex-col mb-4">
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                {category && (
-                  <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                    {category}
-                  </span>
-                )}
-                {complexity && (
-                  <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                    {complexity}
-                  </span>
-                )}
-              </div>
-              <h2 className="text-2xl font-bold">Interview Recording</h2>
-            </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Video Player */}
-        <div className="flex-grow bg-black rounded-lg overflow-hidden relative">
-          {videoUrl ? (
-            <video 
-              src={videoUrl} 
-              controls 
-              className="w-full h-full"
-            >
-              Your browser does not support the video tag.
-            </video>
-          ) : (
-            <div className="flex items-center justify-center h-full text-white">
-              <p>Video not available</p>
-            </div>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex justify-end items-center space-x-3 mt-4">
-          <Button 
-            variant="outline"
-            onClick={handleShare}
-            disabled={!videoUrl}
-            className="gap-2"
-          >
-            <Share2 className="h-4 w-4" />
-            Share
-          </Button>
-          <Button 
-            variant="default"
-            onClick={handleDownload}
-            disabled={!videoUrl}
-            className="gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download Recording
-          </Button>
-        </div>
-      </div>
-    </motion.div>
-  )
+    <EnhancedVideoPlayer
+      videoUrl={videoUrl}
+      onClose={onClose}
+      onDownload={handleDownload}
+      processing={processing}
+      progress={progress}
+      category={category}
+      complexity={complexity}
+    />
+  );
 }
