@@ -1,65 +1,86 @@
-import React, { useState, useRef } from 'react';
-import { X, Download, Share2 } from 'lucide-react';
+import React, { useRef, useEffect } from 'react';
+import { X, Download, Share2, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from "@/hooks/use-toast";
-
-
-type GradientType = 'aurora' | 'sunset' | 'ocean' | 'forest' | 'cosmic';
-type AspectRatioType = '16:9' | '4:3' | '1:1' | '9:16';
-
-const gradients: Record<GradientType, string> = {
-  aurora: 'bg-gradient-to-br from-purple-500 via-blue-500 to-green-400',
-  sunset: 'bg-gradient-to-br from-orange-500 via-red-500 to-purple-500',
-  ocean: 'bg-gradient-to-br from-blue-400 via-blue-600 to-blue-800',
-  forest: 'bg-gradient-to-br from-green-400 via-green-600 to-green-800',
-  cosmic: 'bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500'
-};
-
-const aspectRatioDimensions: Record<AspectRatioType, { width: number; height: number }> = {
-  '16:9': { width: 1920, height: 1080 },
-  '4:3': { width: 1440, height: 1080 },
-  '1:1': { width: 1080, height: 1080 },
-  '9:16': { width: 1080, height: 1920 }
-};
 
 interface EnhancedVideoPlayerProps {
   videoUrl: string;
   onClose: () => void;
-  onDownload: () => void;
+  onDownload: (
+    videoRef: HTMLVideoElement,
+    containerRef: HTMLDivElement,
+    background: string,
+    blurIntensity: number,
+    showBorder: boolean,
+    showShadow: boolean,
+    aspectRatio: { width: number; height: number }
+  ) => Promise<void>;
+  onSelectBackground: () => void;
+  backgroundImage: File | null;
   processing: boolean;
   progress: number;
   category?: string;
   complexity?: string;
 }
 
-export default function EnhancedVideoPlayer({
-  videoUrl,
+export default function EnhancedVideoPlayer({ 
+  videoUrl, 
   onClose,
   onDownload,
+  onSelectBackground,
+  backgroundImage,
   processing,
   progress,
   category,
   complexity
 }: EnhancedVideoPlayerProps) {
   const { toast } = useToast();
-  const [background, setBackground] = useState<GradientType>('aurora');
-  const [aspectRatio, setAspectRatio] = useState<AspectRatioType>('16:9');
-  const [showBorder, setShowBorder] = useState(true);
-  const [showShadow, setShowShadow] = useState(true);
-  const [blurIntensity, setBlurIntensity] = useState(8);
-  const [showControls, setShowControls] = useState(true);
+  const [showBorder, setShowBorder] = React.useState(true);
+  const [showShadow, setShowShadow] = React.useState(true);
+  const [showControls, setShowControls] = React.useState(true);
+  const [backgroundPreviewUrl, setBackgroundPreviewUrl] = React.useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Create object URL for background image preview
+  useEffect(() => {
+    if (backgroundImage) {
+      const url = URL.createObjectURL(backgroundImage);
+      setBackgroundPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [backgroundImage]);
+
+  const handleDownloadClick = () => {
+    if (!videoRef.current || !containerRef.current) {
+      toast({
+        title: "Error",
+        description: "Video element not found"
+      });
+      return;
+    }
+
+    if (!backgroundImage) {
+      toast({
+        title: "Error",
+        description: "Please select a background image first"
+      });
+      return;
+    }
+
+    // Using fixed 720p aspect ratio
+    onDownload(
+      videoRef.current,
+      containerRef.current,
+      'bg', // This is no longer used since we pass backgroundImage directly
+      8, // Fixed blur value
+      showBorder,
+      showShadow,
+      { width: 1280, height: 720 } // Fixed 720p resolution
+    );
+  };
 
   const handleShare = async () => {
     try {
@@ -111,23 +132,19 @@ export default function EnhancedVideoPlayer({
         {/* Main Content */}
         <div className="flex flex-1 gap-6 p-6 overflow-hidden">
           {/* Video Preview Area */}
-          <div ref={containerRef}
-            className={`flex-1 ${gradients[background]} p-8 rounded-xl overflow-hidden flex items-center justify-center`}>
-            <div className={`relative aspect-ratio-container`}
-              style={{
-                aspectRatio: `${aspectRatioDimensions[aspectRatio].width} / ${aspectRatioDimensions[aspectRatio].height}`,
-                width: '100%',
-                maxHeight: '100%'
-              }}>
+          <div ref={containerRef} 
+               className="flex-1 rounded-xl overflow-hidden flex items-center justify-center relative"
+               style={{
+                 background: backgroundPreviewUrl ? `url(${backgroundPreviewUrl})` : '#1f2937',
+                 backgroundSize: 'cover',
+                 backgroundPosition: 'center'
+               }}>
+            <div className="relative aspect-video w-[640px]">
               <video
                 ref={videoRef}
                 src={videoUrl}
                 controls={showControls}
-                className={`
-                  w-full h-full object-contain
-                  ${showBorder ? 'ring-4 ring-white/20' : ''}
-                  ${showShadow ? 'shadow-2xl' : ''}
-                `}
+                className={`w-full h-full object-contain ${showBorder ? 'ring-4 ring-white/20' : ''} ${showShadow ? 'shadow-2xl' : ''}`}
               >
                 Your browser does not support the video tag.
               </video>
@@ -136,55 +153,25 @@ export default function EnhancedVideoPlayer({
 
           {/* Controls Panel */}
           <div className="w-72 bg-gray-50 dark:bg-gray-900 rounded-xl p-4 space-y-6 overflow-y-auto">
+            {/* Background Image Selection */}
             <div className="space-y-4">
-              <h3 className="font-medium">Background</h3>
-              <Select
-                defaultValue={background}
-                onValueChange={(value: GradientType) => setBackground(value)}
+              <h3 className="font-medium">Background Image</h3>
+              <Button 
+                onClick={onSelectBackground}
+                className="w-full gap-2"
+                variant={backgroundImage ? "secondary" : "default"}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="aurora">Aurora</SelectItem>
-                  <SelectItem value="sunset">Sunset</SelectItem>
-                  <SelectItem value="ocean">Ocean</SelectItem>
-                  <SelectItem value="forest">Forest</SelectItem>
-                  <SelectItem value="cosmic">Cosmic</SelectItem>
-                </SelectContent>
-              </Select>
+                <Image className="h-4 w-4" />
+                {backgroundImage ? 'Change Background' : 'Select Background'}
+              </Button>
+              {backgroundImage && (
+                <p className="text-sm text-gray-500 break-all">
+                  Selected: {backgroundImage.name}
+                </p>
+              )}
             </div>
 
-
-            <div className="space-y-4">
-              <h3 className="font-medium">Aspect Ratio</h3>
-              <Select
-                defaultValue={aspectRatio}
-                onValueChange={(value: AspectRatioType) => setAspectRatio(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="16:9">16:9 (1920×1080)</SelectItem>
-                  <SelectItem value="4:3">4:3 (1440×1080)</SelectItem>
-                  <SelectItem value="1:1">1:1 (1080×1080)</SelectItem>
-                  <SelectItem value="9:16">9:16 (1080×1920)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="font-medium">Background Blur</h3>
-              <Slider
-                value={[blurIntensity]}
-                min={0}
-                max={16}
-                step={2}
-                onValueChange={(value) => setBlurIntensity(value[0])}
-              />
-            </div>
-
+            {/* Video Controls */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span>Show Border</span>
@@ -198,6 +185,11 @@ export default function EnhancedVideoPlayer({
                 <span>Show Controls</span>
                 <Switch checked={showControls} onCheckedChange={setShowControls} />
               </div>
+            </div>
+
+            {/* Info Note */}
+            <div className="text-sm text-muted-foreground">
+              <p>Video will be rendered at 720p (1280×720) resolution with your selected background image.</p>
             </div>
           </div>
         </div>
@@ -219,8 +211,8 @@ export default function EnhancedVideoPlayer({
               Share
             </Button>
             <Button 
-              onClick={onDownload} 
-              disabled={processing}
+              onClick={handleDownloadClick} 
+              disabled={processing || !backgroundImage}
               className="gap-2"
             >
               <Download className="h-4 w-4" />
