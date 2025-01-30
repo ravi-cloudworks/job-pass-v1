@@ -101,10 +101,10 @@ export default function ViewCompleteMockInterviewModal({
     const yPos = (OUTPUT_HEIGHT - VIDEO_HEIGHT) / 2;
 
     const filterComplex = [
-      // Scale background to full HD and pad if needed
-      `[1:v]scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,pad=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2[bg]`,
-      // Scale video to 720p
-      `[0:v]scale=${VIDEO_WIDTH}:${VIDEO_HEIGHT}:force_original_aspect_ratio=decrease,pad=${VIDEO_WIDTH}:${VIDEO_HEIGHT}:(ow-iw)/2:(oh-ih)/2[scaled]`,
+      // Scale background to fill 1920x1080 completely
+      `[1:v]scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,crop=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}[bg]`,
+      // Scale video maintaining aspect ratio but ensure it fits within 1280x720
+      `[0:v]scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[scaled]`,
       // Overlay video on background
       `[bg][scaled]overlay=${xPos}:${yPos}[main]`
     ];
