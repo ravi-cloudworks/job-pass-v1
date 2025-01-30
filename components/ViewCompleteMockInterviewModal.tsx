@@ -101,12 +101,12 @@ export default function ViewCompleteMockInterviewModal({
     const yPos = (OUTPUT_HEIGHT - VIDEO_HEIGHT) / 2;
 
     const filterComplex = [
-      // Scale background to fill 1920x1080 completely
-      `[1:v]scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,crop=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}[bg]`,
-      // Scale video maintaining aspect ratio but ensure it fits within 1280x720
-      `[0:v]scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2[scaled]`,
-      // Overlay video on background
-      `[bg][scaled]overlay=${xPos}:${yPos}[main]`
+      // Scale background and set start time to 0
+      `[1:v]scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,crop=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT},setpts=PTS-STARTPTS[bg]`,
+      // Scale video and ensure it starts at 0
+      `[0:v]scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setpts=PTS-STARTPTS[scaled]`,
+      // Overlay video on background with immediate start
+      `[bg][scaled]overlay=${xPos}:${yPos}:eof_action=repeat[main]`
     ];
 
     // Add border if enabled
