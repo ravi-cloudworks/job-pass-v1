@@ -7,6 +7,12 @@ import { fetchFile } from '@ffmpeg/util';
 const FFMPEG_CORE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/umd/ffmpeg-core.js';
 const FFMPEG_WASM_URL = 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/umd/ffmpeg-core.wasm';
 
+// Output dimensions
+const OUTPUT_WIDTH = 1920;
+const OUTPUT_HEIGHT = 1080;
+const VIDEO_WIDTH = 1280;
+const VIDEO_HEIGHT = 720;
+
 interface ViewCompleteMockInterviewModalProps {
   onClose: () => void;
   videoUrl: string;
@@ -33,16 +39,35 @@ export default function ViewCompleteMockInterviewModal({
         console.log('Creating FFmpeg instance...');
         const ffmpegInstance = new FFmpeg();
         
-        ffmpegInstance.on('log', ({ message }: { message: string }) => {
-          console.log('FFmpeg Log:', message);
-          if (message.toLowerCase().includes('error') || message.toLowerCase().includes('failed')) {
-            console.warn('Potential FFmpeg error:', message);
-          }
-        });
+        // Track total frames for better progress calculation
+        let totalFrames = 0;
+        let currentFrame = 0;
 
-        ffmpegInstance.on('progress', ({ progress: progressVal }: { progress: number }) => {
-          console.log('Progress:', progressVal);
-          setProgress(Math.round(progressVal * 100));
+        ffmpegInstance.on('log', ({ message }) => {
+          console.log('FFmpeg Log:', message);
+          
+          // Get total frames from input video info
+          if (message.includes('Stream #0:1') && message.includes('fps')) {
+            const fpsMatch = message.match(/(\d+(\.\d+)?) fps/);
+            const durationMatch = message.match(/Duration: (\d{2}):(\d{2}):(\d{2})/);
+            if (fpsMatch && durationMatch) {
+              const fps = parseFloat(fpsMatch[1]);
+              const hours = parseInt(durationMatch[1]);
+              const minutes = parseInt(durationMatch[2]);
+              const seconds = parseInt(durationMatch[3]);
+              totalFrames = fps * (hours * 3600 + minutes * 60 + seconds);
+            }
+          }
+
+          // Track frame processing
+          const frameMatch = message.match(/frame=\s*(\d+)/);
+          if (frameMatch) {
+            currentFrame = parseInt(frameMatch[1]);
+            if (totalFrames > 0) {
+              const progress = (currentFrame / totalFrames) * 100;
+              setProgress(Math.min(Math.round(progress), 100));
+            }
+          }
         });
 
         await ffmpegInstance.load({
@@ -70,6 +95,47 @@ export default function ViewCompleteMockInterviewModal({
     };
   }, []);
 
+  // Function to construct FFmpeg command
+  const constructFFmpegCommand = (showBorderProp: boolean) => {
+    const xPos = (OUTPUT_WIDTH - VIDEO_WIDTH) / 2;
+    const yPos = (OUTPUT_HEIGHT - VIDEO_HEIGHT) / 2;
+
+    const filterComplex = [
+      // Scale background to full HD and pad if needed
+      `[1:v]scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,pad=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2[bg]`,
+      // Scale video to 720p
+      `[0:v]scale=${VIDEO_WIDTH}:${VIDEO_HEIGHT}:force_original_aspect_ratio=decrease,pad=${VIDEO_WIDTH}:${VIDEO_HEIGHT}:(ow-iw)/2:(oh-ih)/2[scaled]`,
+      // Overlay video on background
+      `[bg][scaled]overlay=${xPos}:${yPos}[main]`
+    ];
+
+    // Add border if enabled
+    let lastOutput = '[main]';
+    if (showBorderProp) {
+      filterComplex.push(`${lastOutput}drawbox=x=${xPos}:y=${yPos}:w=${VIDEO_WIDTH}:h=${VIDEO_HEIGHT}:color=white@0.2:thickness=4[bordered]`);
+      lastOutput = '[bordered]';
+    }
+
+    return {
+      command: [
+        '-i', 'input.webm',
+        '-i', 'background.png',
+        '-filter_complex', filterComplex.join(';'),
+        '-map', lastOutput,
+        '-map', '0:a?',
+        '-c:v', 'libx264',
+        '-preset', 'medium',
+        '-crf', '23',
+        '-c:a', 'aac',
+        '-b:a', '192k',
+        '-movflags', '+faststart',
+        '-y',
+        'output.mp4'
+      ],
+      filterComplex
+    };
+  };
+
   const handleDownload = async (
     videoRef: HTMLVideoElement,
     containerRef: HTMLDivElement,
@@ -79,7 +145,6 @@ export default function ViewCompleteMockInterviewModal({
     showShadowProp: boolean,
     aspectRatio: { width: number; height: number }
   ): Promise<void> => {
-    // Start a new console group for this operation
     console.group('Video Processing Operation');
     console.log('Starting video processing...');
 
@@ -97,21 +162,12 @@ export default function ViewCompleteMockInterviewModal({
       setProcessing(true);
       setProgress(0);
 
-      // Log initial state
-      console.log('Initial state:', {
-        videoUrl,
-        backgroundImage: backgroundImage.name,
-        showBorder: showBorderProp,
-        showShadow: showShadowProp,
-      });
-
-      // Step 1: Prepare files
-      console.group('Step 1: File Preparation');
-      console.log('Fetching video data...');
+      // Step 1: File reading - 10% of progress
+      setProgress(5);
       const videoData = await fetchFile(videoUrl);
-      console.log('Video data size:', videoData.length);
+      setProgress(10);
 
-      console.log('Reading background image...');
+      // Step 2: Background preparation - 20% of progress
       const reader = new FileReader();
       const backgroundData = await new Promise<Uint8Array>((resolve, reject) => {
         reader.onload = () => {
@@ -121,83 +177,25 @@ export default function ViewCompleteMockInterviewModal({
         reader.onerror = () => reject(reader.error);
         reader.readAsArrayBuffer(backgroundImage);
       });
-      console.log('Background image size:', backgroundData.length);
-      console.groupEnd();
+      setProgress(20);
 
-      // Step 2: Write files to FFmpeg
-      console.group('Step 2: Writing Files to FFmpeg');
-      console.log('Writing input.webm...');
+      // Step 3: Writing files - 30% of progress
       await ffmpeg.writeFile('input.webm', videoData);
-      console.log('Writing background.png...');
+      setProgress(25);
       await ffmpeg.writeFile('background.png', backgroundData);
-      
-      const files = await ffmpeg.listDir('/');
-      console.log('Files in FFmpeg filesystem:', files);
-      console.groupEnd();
+      setProgress(30);
 
-      // Step 3: Prepare FFmpeg command
-      console.group('Step 3: FFmpeg Command Preparation');
-      // Simplified filter complex with fixed expressions
-      const filterComplex = [
-        // Scale background to 720p
-        '[1:v]scale=1280:720[bg]',
-        // Scale video
-        '[0:v]scale=640:480[scaled]',
-        // Overlay video on background centered
-        '[bg][scaled]overlay=x=(1280-640)/2:y=(720-480)/2[v0]'
-      ];
+      // Step 4: FFmpeg processing - 30% to 90%
+      const { command } = constructFFmpegCommand(showBorderProp);
+      console.log('FFmpeg command:', command.join(' '));
+      await ffmpeg.exec(command);
 
-      if (showBorderProp) {
-        // Add border with fixed coordinates
-        filterComplex.push('[v0]drawbox=x=320:y=120:w=640:h=480:color=white@0.2:thickness=2[v1]');
-      }
-
-      const lastOutput = showBorderProp ? '[v1]' : '[v0]';
-
-      // Construct FFmpeg command
-      const ffmpegCommand = [
-        '-i', 'input.webm',
-        '-i', 'background.png',
-        '-filter_complex', filterComplex.join(';'),
-        '-map', lastOutput,
-        '-map', '0:a?',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '28',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-y',
-        'output.mp4'
-      ];
-
-      // Log command in readable format
-      console.log('FFmpeg command:');
-      console.log('ffmpeg \\');
-      ffmpegCommand.forEach((part, index) => {
-        if (index % 2 === 0 && part.startsWith('-')) {
-          console.log(`  ${part} ${ffmpegCommand[index + 1]} \\`);
-        }
-      });
-      console.groupEnd();
-
-      // Step 4: Execute FFmpeg
-      console.group('Step 4: FFmpeg Execution');
-      console.log('Starting FFmpeg execution...');
-      await ffmpeg.exec(ffmpegCommand);
-      console.log('FFmpeg execution completed');
-
-      const outputFiles = await ffmpeg.listDir('/');
-      console.log('Files after FFmpeg execution:', outputFiles);
-      console.groupEnd();
-
-      // Step 5: Read and download output
-      console.group('Step 5: File Download');
-      console.log('Reading output.mp4...');
+      // Step 5: Read and create download - 90% to 100%
+      setProgress(90);
       const data = await ffmpeg.readFile('output.mp4');
-      console.log('Output file size:', data.length);
+      setProgress(95);
 
       const blob = new Blob([data], { type: 'video/mp4' });
-      console.log('Created blob size:', blob.size);
       const url = URL.createObjectURL(blob);
 
       const link = document.createElement('a');
@@ -207,33 +205,23 @@ export default function ViewCompleteMockInterviewModal({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      console.log('Download initiated');
-      console.groupEnd();
 
       // Cleanup
-      console.group('Step 6: Cleanup');
       await ffmpeg.deleteFile('input.webm');
       await ffmpeg.deleteFile('background.png');
       await ffmpeg.deleteFile('output.mp4');
-      console.log('Cleanup completed');
-      console.groupEnd();
 
+      setProgress(100);
       console.log('Operation completed successfully');
-      console.groupEnd(); // End main group
+      console.groupEnd();
 
       toast({
         title: "Download Complete",
         description: "Your styled video has been saved as MP4.",
       });
     } catch (error: any) {
-      console.error('Operation failed with error:', {
-        name: error?.name,
-        message: error?.message,
-        stack: error?.stack,
-        code: error?.code,
-        errno: error?.errno,
-      });
-      console.groupEnd(); // End main group even on error
+      console.error('Operation failed with error:', error);
+      console.groupEnd();
       toast({
         title: "Processing Failed",
         description: error?.message || "There was an error processing your video. Please try again.",

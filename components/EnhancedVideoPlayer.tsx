@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { X, Download, Share2, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -40,12 +40,12 @@ export default function EnhancedVideoPlayer({
   const [showBorder, setShowBorder] = React.useState(true);
   const [showShadow, setShowShadow] = React.useState(true);
   const [showControls, setShowControls] = React.useState(true);
-  const [backgroundPreviewUrl, setBackgroundPreviewUrl] = React.useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [backgroundPreviewUrl, setBackgroundPreviewUrl] = React.useState<string>('');
 
   // Create object URL for background image preview
-  useEffect(() => {
+  React.useEffect(() => {
     if (backgroundImage) {
       const url = URL.createObjectURL(backgroundImage);
       setBackgroundPreviewUrl(url);
@@ -62,23 +62,14 @@ export default function EnhancedVideoPlayer({
       return;
     }
 
-    if (!backgroundImage) {
-      toast({
-        title: "Error",
-        description: "Please select a background image first"
-      });
-      return;
-    }
-
-    // Using fixed 720p aspect ratio
     onDownload(
       videoRef.current,
       containerRef.current,
-      'bg', // This is no longer used since we pass backgroundImage directly
-      8, // Fixed blur value
+      'bg',
+      8,
       showBorder,
       showShadow,
-      { width: 1280, height: 720 } // Fixed 720p resolution
+      { width: 1920, height: 1080 }
     );
   };
 
@@ -130,24 +121,51 @@ export default function EnhancedVideoPlayer({
         </div>
 
         {/* Main Content */}
-        <div className="flex flex-1 gap-6 p-6 overflow-hidden">
+        <div className="flex flex-1 gap-6 p-6 overflow-hidden" ref={containerRef}>
           {/* Video Preview Area */}
-          <div ref={containerRef} 
-               className="flex-1 rounded-xl overflow-hidden flex items-center justify-center relative"
-               style={{
-                 background: backgroundPreviewUrl ? `url(${backgroundPreviewUrl})` : '#1f2937',
-                 backgroundSize: 'cover',
-                 backgroundPosition: 'center'
-               }}>
-            <div className="relative aspect-video w-[640px]">
-              <video
-                ref={videoRef}
-                src={videoUrl}
-                controls={showControls}
-                className={`w-full h-full object-contain ${showBorder ? 'ring-4 ring-white/20' : ''} ${showShadow ? 'shadow-2xl' : ''}`}
-              >
-                Your browser does not support the video tag.
-              </video>
+          <div className="flex-1 rounded-xl overflow-hidden flex items-center justify-center p-4">
+            {/* Container maintaining 16:9 aspect ratio */}
+            <div className="w-full relative" style={{ paddingBottom: '56.25%' }}> {/* 9/16 = 0.5625 */}
+              {/* Content container */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                {/* Background and video container */}
+                <div className="relative w-full h-full"
+                     style={{
+                       maxWidth: '1920px',
+                       maxHeight: '1080px',
+                       aspectRatio: '16/9',
+                     }}>
+                  {/* Background Image */}
+                  {backgroundPreviewUrl && (
+                    <div className="absolute inset-0" 
+                         style={{
+                           backgroundImage: `url(${backgroundPreviewUrl})`,
+                           backgroundSize: 'contain',
+                           backgroundPosition: 'center',
+                           backgroundRepeat: 'no-repeat',
+                         }}
+                    />
+                  )}
+                  
+                  {/* Video Container - centered with padding */}
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                       style={{
+                         width: '66.67%',  /* 1280px relative to 1920px */
+                         height: '66.67%', /* 720px relative to 1080px */
+                       }}>
+                    <video
+                      ref={videoRef}
+                      src={videoUrl}
+                      controls={showControls}
+                      className={`w-full h-full object-contain
+                        ${showBorder ? 'ring-4 ring-white/20' : ''}
+                        ${showShadow ? 'shadow-2xl' : ''}`}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -189,7 +207,7 @@ export default function EnhancedVideoPlayer({
 
             {/* Info Note */}
             <div className="text-sm text-muted-foreground">
-              <p>Video will be rendered at 720p (1280×720) resolution with your selected background image.</p>
+              <p>Video will be rendered at 1080p (1920×1080) resolution with your selected background image.</p>
             </div>
           </div>
         </div>
