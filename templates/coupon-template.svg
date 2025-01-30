@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 85.6 54" width="85.6mm" height="54mm">
+  <!-- Dashed Border for Tear Lines -->
+  <defs>
+    <pattern id="tearPattern" width="4" height="4" patternUnits="userSpaceOnUse">
+      <path d="M0,2 L4,2" stroke="#999" stroke-width="0.5" stroke-dasharray="2,2"/>
+    </pattern>
+  </defs>
+  
+  <!-- Background -->
+  <rect x="1" y="1" width="83.6" height="52" fill="#FFFAF0" rx="2"/>
+  
+  <!-- Border with Tear Effect -->
+  <rect x="1" y="1" width="83.6" height="52" 
+        stroke="#FF6B6B" 
+        stroke-width="2" 
+        fill="none" 
+        rx="2"/>
+  
+  <!-- Tear Lines -->
+  <rect x="0" y="0" width="85.6" height="54" 
+        stroke="url(#tearPattern)" 
+        stroke-width="1" 
+        fill="none"/>
+  
+  <!-- Divider Line -->
+  <line x1="1" y1="32" x2="84.6" y2="32" 
+        stroke="#FF6B6B" 
+        stroke-width="1" 
+        stroke-dasharray="2,2"/>
+  
+  <!-- Text Areas -->
+  <text x="42.8" y="12" 
+        font-family="Arial Black, Arial" 
+        font-size="6" 
+        text-anchor="middle" 
+        font-weight="bold">COUPON CODE</text>
+  
+  <!-- Code Display (Split into two parts for dash) -->
+  <text x="38" y="24" 
+        font-family="Arial Black, Arial" 
+        font-size="10" 
+        text-anchor="end" 
+        font-weight="bold"
+        class="coupon-code-part1">123</text>
+  <text x="42" y="24" 
+        font-family="Arial Black, Arial" 
+        font-size="10" 
+        text-anchor="middle" 
+        font-weight="bold">-</text>
+  <text x="47" y="24" 
+        font-family="Arial Black, Arial" 
+        font-size="10" 
+        text-anchor="start" 
+        font-weight="bold"
+        class="coupon-code-part2">4567</text>
+
+  <!-- Timestamp and Expiration Text -->
+  <text x="42.8" y="29" 
+        font-family="Arial" 
+        font-size="3" 
+        text-anchor="middle" 
+        fill="#666666"
+        class="timestamp-text">Created: DATE_TIME</text>
+  
+  <text x="42.8" y="31" 
+        font-family="Arial" 
+        font-size="3" 
+        text-anchor="middle" 
+        fill="#666666"
+        class="expiry-text">Expires: EXPIRY_DATE</text>
+  
+  <!-- Logo Area -->
+  <rect x="5" y="34" width="75.6" height="16" 
+        fill="none" 
+        class="logo-area"/>
+</svg>
