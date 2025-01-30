@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 85.6 54">
+        <defs>
+          <clipPath id="imageClip">
+            <path d="M1,1 L38,1 L42,53 L1,53 Z" />
+          </clipPath>
+          <linearGradient id="imageOverlay" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#000000" stopOpacity="0.2"/>
+            <stop offset="100%" stopColor="#000000" stopOpacity="0.5"/>
+          </linearGradient>
+        </defs>
+      
+        {/* Card Background */}
+        <rect x="1" y="1" width="83.6" height="52" fill="white" rx="4"/>
+        
+        {/* Image Section with Overlay */}
+        <g clipPath="url(#imageClip)">
+          {imageUrl ? (
+            <>
+              <image
+                x="1" y="1"
+                width="41"
+                height="52"
+                href={imageUrl}
+                preserveAspectRatio="xMidYMid slice"
+              />
+              <path d="M1,1 L38,1 L42,53 L1,53 Z" fill="url(#imageOverlay)"/>
+            </>
+          ) : (
+            <rect x="1" y="1" width="41" height="52" fill="#e0e0e0"/>
+          )}
+        </g>
+      
+        {/* Website Text */}
+        <text x="44" y="8" fontFamily="Arial" fontSize="3" fill="#666">
+          go to {websiteUrl}
+        </text>
+      
+        {/* Logo Area */}
+        {logoUrl ? (
+          <image
+            x="70" y="4"
+            width="7"
+            height="7"
+            href={logoUrl}
+            preserveAspectRatio="xMidYMid slice"
+          />
+        ) : (
+          <circle cx="73.5" cy="7.5" r="3.5" fill="none" stroke="#ccc" strokeWidth="0.5"/>
+        )}
+      
+        {/* Gift Voucher Text */}
+        <text x="44" y="20" fontFamily="Arial" fontSize="9" fontWeight="bold" fill="#FF4444">
+          GIFT
+        </text>
+        <text x="44" y="32" fontFamily="Arial" fontSize="9" fontWeight="bold" fill="#FF4444">
+          VOUCHER
+        </text>
+      
+        {/* Coupon Code */}
+        <text x="44" y="46" fontFamily="Arial Black" fontSize="14" fontWeight="900" fill="#333">
+          {couponCode}
+        </text>
+      
+        {/* Validity Box */}
+        <rect x="44" y="48" width="35" height="4" stroke="#333" strokeWidth="0.5" fill="white" rx="1"/>
+        <text x="61.5" y="51" fontFamily="Arial" fontSize="2.5" textAnchor="middle" fill="#333">
+          VALID UNTIL {expiryDate}
+        </text>
+      
+        {/* Menu Dots */}
+        <circle cx="80" cy="4" r="0.5" fill="#333"/>
+        <circle cx="82" cy="4" r="0.5" fill="#333"/>
+        <circle cx="84" cy="4" r="0.5" fill="#333"/>
+      
+        {/* Corner Dots */}
+        <circle cx="3" cy="3" r="0.5" fill="#fff"/>
+        <circle cx="3" cy="51" r="0.5" fill="#fff"/>
+        <circle cx="82" cy="51" r="0.5" fill="#333"/>
+        <circle cx="82" cy="3" r="0.5" fill="#333"/>
+      </svg>
