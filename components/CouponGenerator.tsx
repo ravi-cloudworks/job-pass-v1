@@ -53,7 +53,7 @@ const CouponGenerator = () => {
 
   // Load default background on mount
   useEffect(() => {
-    fetch('/templates/default-coupon-background-image.png')
+    fetch('./templates/default-coupon-background-image.png')
       .then(response => response.blob())
       .then(blob => {
         const reader = new FileReader();
