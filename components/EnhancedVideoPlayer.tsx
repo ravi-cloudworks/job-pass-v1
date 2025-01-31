@@ -39,7 +39,6 @@ export default function EnhancedVideoPlayer({
   const { toast } = useToast();
   const [showBorder, setShowBorder] = React.useState(true);
   const [showShadow, setShowShadow] = React.useState(true);
-  const [showControls, setShowControls] = React.useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [backgroundPreviewUrl, setBackgroundPreviewUrl] = React.useState<string>('');
@@ -156,7 +155,7 @@ export default function EnhancedVideoPlayer({
                     <video
                       ref={videoRef}
                       src={videoUrl}
-                      controls={showControls}
+                      controls={true}
                       className={`w-full h-full object-contain
                         ${showBorder ? 'ring-4 ring-white/20' : ''}
                         ${showShadow ? 'shadow-2xl' : ''}`}
@@ -198,10 +197,6 @@ export default function EnhancedVideoPlayer({
               <div className="flex items-center justify-between">
                 <span>Show Shadow</span>
                 <Switch checked={showShadow} onCheckedChange={setShowShadow} />
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Show Controls</span>
-                <Switch checked={showControls} onCheckedChange={setShowControls} />
               </div>
             </div>
 

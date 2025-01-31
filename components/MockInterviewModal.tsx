@@ -3,12 +3,21 @@
 import React, { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import { ChevronLeft, ChevronRight, VideoOff, X, Play, CheckSquare, Loader2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
+import html2canvas from 'html2canvas'
 
-import html2canvas from 'html2canvas';
+// Video configuration constants
+const VIDEO_CONFIG = {
+  WIDTH: 1280,
+  HEIGHT: 720,
+  FPS: 30,
+  BITRATE: 2500000,
+  WEBCAM_SCALE: 0.4,
+} as const;
 
 interface MockInterviewModalProps {
   onClose: () => void
@@ -30,6 +39,12 @@ interface QuestionSet {
   questions: Question[]
 }
 
+interface QuestionSnapshot {
+  timestamp: number
+  imageData: HTMLCanvasElement
+  questionIndex: number
+}
+
 export default function MockInterviewModal({
   onClose,
   onComplete,
@@ -38,34 +53,89 @@ export default function MockInterviewModal({
   complexity
 }: MockInterviewModalProps) {
   const { toast } = useToast()
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [isInterviewStarted, setIsInterviewStarted] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [title, setTitle] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [startTime, setStartTime] = useState<number | null>(null);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  // State management
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [isInterviewStarted, setIsInterviewStarted] = useState(false)
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(0)
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [title, setTitle] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [processProgress, setProcessProgress] = useState(0)
+  const [questionSnapshots, setQuestionSnapshots] = useState<QuestionSnapshot[]>([])
+  const [interviewStartTime, setInterviewStartTime] = useState(0)
 
-  // Add new ref for the content area
-  const contentRef = useRef<HTMLDivElement>(null);
+  // Refs
+  const questionContainerRef = useRef<HTMLDivElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const webcamChunks = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
+
+  // Initialize camera
+  const initializeCamera = async () => {
+    setError(null)
+    try {
+      console.log("Initializing camera preview...")
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: VIDEO_CONFIG.WIDTH },
+          height: { ideal: VIDEO_CONFIG.HEIGHT }
+        },
+        audio: true
+      })
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        streamRef.current = stream
+
+        await new Promise((resolve) => {
+          if (videoRef.current) {
+            videoRef.current.onloadedmetadata = () => resolve(true)
+          }
+        })
+
+        setIsStreaming(true)
+        setError(null)
+        console.log("Camera initialized successfully")
+      }
+    } catch (err) {
+      console.error("Camera preview error:", err)
+      setError("Unable to access camera. Please check permissions.")
+      setIsStreaming(false)
+    }
+  }
+
+  // Cleanup function
+  const stopWebcam = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setIsStreaming(false)
+  }
 
   // Initialize camera on mount
   useEffect(() => {
-    initializeCamera();
-
+    initializeCamera()
     return () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-      }
-      stopWebcam();
-    };
-  }, []);
+      stopWebcam()
+    }
+  }, [])
 
   // Questions fetch effect
   useEffect(() => {
@@ -85,9 +155,9 @@ export default function MockInterviewModal({
         setQuestions(data.questions)
         setTitle(data.title)
         setTimeLeft(data.time_limit)
-      } catch (error) {
-        console.error("Error loading questions:", error)
-        setError(`Failed to load interview questions`)
+      } catch (err) {
+        console.error("Error loading questions:", err)
+        setError("Failed to load interview questions")
       } finally {
         setIsLoading(false)
       }
@@ -101,7 +171,7 @@ export default function MockInterviewModal({
     let timer: NodeJS.Timeout
     if (isInterviewStarted && timeLeft > 0) {
       timer = setInterval(() => {
-        setTimeLeft((prevTime) => prevTime - 1)
+        setTimeLeft(prev => prev - 1)
       }, 1000)
     } else if (timeLeft === 0 && isInterviewStarted) {
       handleCompleteInterview()
@@ -109,287 +179,250 @@ export default function MockInterviewModal({
     return () => clearInterval(timer)
   }, [isInterviewStarted, timeLeft])
 
-  const stopWebcam = () => {
+  // Take snapshot of question section
+  // Take snapshot of question section
+  const takeSnapshot = async () => {
+    if (!questionContainerRef.current) return null
+  
     try {
-      if (streamRef.current) {
-        const tracks = streamRef.current.getTracks();
-        tracks.forEach(track => {
-          try {
-            track.stop();
-            console.log(`Stopped track: ${track.kind}`);
-          } catch (e) {
-            console.error(`Error stopping track ${track.kind}:`, e);
-          }
-        });
-        streamRef.current = null;
+      // Instead of .content-section, let's target the active question content
+      const contentSection = isInterviewStarted 
+        ? questionContainerRef.current.querySelector('.text-2xl.font-semibold.flex-grow')
+        : questionContainerRef.current.querySelector('.content-section');
+  
+      if (!(contentSection instanceof HTMLElement)) {
+        console.error('Content section not found')
+        return null
       }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-      setIsStreaming(false);
-    } catch (error) {
-      console.error("Error in stopWebcam:", error);
-    }
-  };
-
-  const initializeCamera = async () => {
-    setError(null);
-    try {
-      console.log("Initializing camera preview...");
-
-      if (streamRef.current) {
-        stopWebcam();
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
-      });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-
-        await new Promise((resolve) => {
-          if (videoRef.current) {
-            videoRef.current.onloadedmetadata = () => {
-              resolve(true);
-            };
-          }
-        });
-
-        setIsStreaming(true);
-        setError(null);
-        console.log("Camera initialized successfully");
+  
+      console.log("Capturing content for question:", currentQuestionIndex) // Debug log
+      
+      // Set specific dimensions for the capture
+      const snapshot = await html2canvas(contentSection, {
+        backgroundColor: 'white',
+        scale: window.devicePixelRatio || 1,
+        width: Math.floor(VIDEO_CONFIG.WIDTH * 0.6), // Make sure width is integer
+        height: VIDEO_CONFIG.HEIGHT,
+        useCORS: true,
+        logging: true // Enable logging for debugging
+      })
+  
+      console.log("Snapshot dimensions:", snapshot.width, "x", snapshot.height) // Debug log
+  
+      return {
+        timestamp: Date.now() - interviewStartTime,
+        imageData: snapshot,
+        questionIndex: currentQuestionIndex
       }
     } catch (err) {
-      console.error("Camera preview error:", err);
-      setError("Unable to access camera. Please check permissions and try again.");
-      setIsStreaming(false);
+      console.error("Error taking snapshot:", err)
+      return null
     }
-  };
+  }
 
+  // Start recording
   const startRecording = async () => {
-    try {
-      if (!contentRef.current) {
-        console.error("Content area not found");
-        return;
-      }
+    if (!streamRef.current) return
 
-      // Get webcam and audio stream
-      const webcamStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
+    setInterviewStartTime(Date.now())
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = webcamStream;
-      }
-
-      // Create a canvas to capture the modal content
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const modalContent = contentRef.current;
-
-      // Set exact dimensions without scaling
-      canvas.width = modalContent.offsetWidth;
-      canvas.height = modalContent.offsetHeight;
-
-      // Create a stream from the canvas
-      const canvasStream = canvas.captureStream(30); // 30 FPS
-
-      const images = modalContent.getElementsByTagName('img');
-      await Promise.all(Array.from(images).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          img.onload = resolve;
-          img.onerror = resolve; // Handle failed loads
-        });
-      }));
-
-
-
-
-      // Create animation frame to continuously draw modal content to canvas
-      function drawCanvas() {
-        if (ctx && modalContent) {
-          html2canvas(modalContent, {
-            useCORS: true,
-            allowTaint: true,
-            foreignObjectRendering: true,
-            imageTimeout: 30000,
-            scale: 1,
-            width: modalContent.offsetWidth,
-            height: modalContent.offsetHeight,
-            onclone: (clonedDoc) => {
-              const clonedImages = clonedDoc.getElementsByTagName('img');
-              Array.from(clonedImages).forEach(img => {
-                img.crossOrigin = "anonymous";
-              });
-            }
-          }).then((contentCanvas) => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(contentCanvas, 0, 0);
-          });
-          requestAnimationFrame(drawCanvas);
-        }
-      }
-
-
-
-      drawCanvas();
-
-      // Combine canvas video with webcam audio
-      const tracks = [
-        ...canvasStream.getVideoTracks(),
-        ...webcamStream.getAudioTracks()
-      ];
-      const combinedStream = new MediaStream(tracks);
-
-      // Setup video preview
-      if (videoRef.current) {
-        videoRef.current.srcObject = webcamStream;
-        streamRef.current = combinedStream;
-      }
-
-      const mediaRecorder = new MediaRecorder(combinedStream, {
-        mimeType: 'video/webm;codecs=vp8',
-        videoBitsPerSecond: 3000000
-      });
-
-      // Rest of your existing mediaRecorder setup...
-      mediaRecorderRef.current = mediaRecorder;
-      const chunks: Blob[] = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        // Stop all tracks
-        webcamStream.getTracks().forEach(track => {
-          track.stop();
-          console.log(`Stopped webcam track: ${track.kind}`);
-        });
-        canvasStream.getTracks().forEach(track => track.stop());
-
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-          streamRef.current = null;
-        }
-
-        const blob = new Blob(chunks, { type: 'video/webm' });
-        const videoUrl = URL.createObjectURL(blob);
-
-        setIsInterviewStarted(false);
-        setStartTime(null);
-        setIsStreaming(false);
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
-
-        toast({
-          title: "Interview Completed",
-          description: "Your mock interview recording has been saved."
-        });
-
-        onComplete(videoUrl);
-      };
-
-      mediaRecorder.start(1000);
-      setStartTime(Date.now());
-
-    } catch (err) {
-      console.error("Recording error:", err);
-      stopWebcam();
-      toast({
-        title: "Recording Error",
-        description: "Failed to start recording. Please check permissions."
-      });
+    // Take initial snapshot
+    const initialSnapshot = await takeSnapshot()
+    if (initialSnapshot) {
+      setQuestionSnapshots([initialSnapshot])
     }
-  };
 
-  const handleStartInterview = async () => {
-    if (questions.length === 0) {
-      setError("No questions available");
-      return;
-    }
-    setIsInterviewStarted(true);
-    await startRecording();
-  };
+    // Setup MediaRecorder for webcam
+    const mediaRecorder = new MediaRecorder(streamRef.current, {
+      mimeType: 'video/webm;codecs=vp9,opus',
+      videoBitsPerSecond: VIDEO_CONFIG.BITRATE
+    })
 
-  const handleCompleteInterview = () => {
-    if (isInterviewStarted && mediaRecorderRef.current) {
-      if (mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.requestData();
-        mediaRecorderRef.current.stop();
-        // Cleanup will be handled in the onstop handler
+    mediaRecorderRef.current = mediaRecorder
+    webcamChunks.current = []
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        webcamChunks.current.push(event.data)
       }
     }
-  };
 
-  const handleClose = () => {
-    stopWebcam();
-    onClose();
-  };
+    mediaRecorder.start(1000)
+    setIsInterviewStarted(true)
+  }
+
+  // Process final video
+  const processVideo = async (webcamBlob: Blob, snapshots: QuestionSnapshot[]) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = VIDEO_CONFIG.WIDTH
+    canvas.height = VIDEO_CONFIG.HEIGHT
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error("Could not get canvas context")
+
+    const videoElement = document.createElement('video')
+    videoElement.src = URL.createObjectURL(webcamBlob)
+    await new Promise(resolve => {
+      videoElement.onloadedmetadata = resolve
+    })
+    videoElement.currentTime = 0
+
+    const totalFrames = Math.ceil(videoElement.duration * VIDEO_CONFIG.FPS)
+    let processedFrames = 0
+
+    const finalStream = canvas.captureStream(VIDEO_CONFIG.FPS)
+    const finalRecorder = new MediaRecorder(finalStream, {
+      mimeType: 'video/webm;codecs=vp9,opus'
+    })
+
+    const finalChunks: Blob[] = []
+    finalRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) finalChunks.push(e.data)
+    }
+
+    return new Promise<string>((resolve, reject) => {
+      finalRecorder.onstop = () => {
+        const finalBlob = new Blob(finalChunks, { type: 'video/webm' })
+        const url = URL.createObjectURL(finalBlob)
+        resolve(url)
+      }
+
+      const processFrame = async () => {
+        if (videoElement.currentTime >= videoElement.duration) {
+          finalRecorder.stop()
+          return
+        }
+      
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+      
+        // Draw question section (left side)
+        const currentTime = videoElement.currentTime * 1000
+        const currentSnapshot = snapshots.reduce((prev, curr) => {
+          return (curr.timestamp <= currentTime && curr.timestamp > prev.timestamp) ? curr : prev
+        }, snapshots[0])
+      
+        ctx.drawImage(currentSnapshot.imageData, 0, 0)
+      
+        // Calculate webcam dimensions maintaining 4:3 aspect ratio
+        const maxWidth = canvas.width * VIDEO_CONFIG.WEBCAM_SCALE
+        const maxHeight = canvas.height * 0.4 // Limit height to 40% of canvas
+      
+        // Get actual video dimensions
+        const videoRatio = videoElement.videoWidth / videoElement.videoHeight
+        let finalWidth, finalHeight
+      
+        if (videoRatio > 4/3) {
+          // Video is wider than 4:3
+          finalWidth = maxWidth
+          finalHeight = maxWidth * (3/4)
+        } else {
+          // Video is taller than 4:3
+          finalHeight = maxHeight
+          finalWidth = maxHeight * (4/3)
+        }
+      
+        const webcamX = canvas.width - finalWidth - 20
+        const webcamY = 20
+      
+        // Draw webcam with corrected dimensions
+        ctx.save()
+        ctx.translate(webcamX + finalWidth, webcamY)
+        ctx.scale(-1, 1)
+        ctx.drawImage(videoElement, 0, 0, finalWidth, finalHeight)
+        ctx.restore()
+      
+        processedFrames++
+        setProcessProgress((processedFrames / totalFrames) * 100)
+      
+        videoElement.currentTime += 1 / VIDEO_CONFIG.FPS
+        requestAnimationFrame(processFrame)
+      }
+
+      finalRecorder.start()
+      processFrame()
+    })
+  }
+
+  // Handle question navigation
+  const handleQuestionChange = async () => {
+    if (isInterviewStarted) {
+      console.log("Taking snapshot for question:", currentQuestionIndex)
+      const snapshot = await takeSnapshot()
+      if (snapshot) {
+        console.log("Snapshot taken at:", snapshot.timestamp, "ms from start")
+        setQuestionSnapshots(prev => [...prev, snapshot])
+      }
+    }
+  }
+  
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex((prevIndex) => prevIndex + 1)
+      console.log("Moving to next question")
+      setCurrentQuestionIndex(prev => prev + 1)
     }
   }
 
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex((prevIndex) => prevIndex - 1)
+      console.log("Moving to previous question")
+      setCurrentQuestionIndex(prev => prev - 1)
     }
   }
 
   useEffect(() => {
     if (isInterviewStarted) {
-      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-        console.log('Attempting to leave page during interview');
-        e.preventDefault();
-        // Just show warning, don't do cleanup
-        const message = 'Are you sure you want to leave? Your interview progress will be lost.';
-        e.returnValue = message;
-        return message;
-      };
-
-      const handleUnload = () => {
-        // Only do cleanup when actually leaving
-        console.log('Page actually unloading');
-        if (mediaRecorderRef.current?.state === 'recording') {
-          mediaRecorderRef.current.stop();
-        }
-        stopWebcam();
-        // Future backend update would go here
-      };
-
-      window.addEventListener('beforeunload', handleBeforeUnload);
-      window.addEventListener('unload', handleUnload);
-
-      return () => {
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-        window.removeEventListener('unload', handleUnload);
-      };
+      handleQuestionChange()
     }
-  }, [isInterviewStarted]);
+  }, [currentQuestionIndex])
 
+  // Handle interview start/complete
+  const handleStartInterview = async () => {
+    if (questions.length === 0) {
+      setError("No questions available")
+      return
+    }
+    await startRecording()
+  }
 
+  const handleCompleteInterview = async () => {
+    if (!mediaRecorderRef.current || !isInterviewStarted) return
+  
+    mediaRecorderRef.current.stop()
+    setIsInterviewStarted(false)
+    setIsProcessing(true)
+  
+    try {
+      const webcamBlob = new Blob(webcamChunks.current, { type: 'video/webm' })
+      console.log("Created webcam blob, size:", webcamBlob.size) // Debug log
+  
+      const finalVideoUrl = await processVideo(webcamBlob, questionSnapshots)
+      console.log("Question snapshots count:", questionSnapshots.length) // Debug log
+      console.log("Snapshots timestamps:", questionSnapshots.map(s => s.timestamp)) // Debug log
+  
+      // Force download
+      const a = document.createElement('a')
+      a.href = finalVideoUrl
+      a.download = `interview-${Date.now()}.webm`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+  
+      onComplete(finalVideoUrl)
+    } catch (err) {
+      console.error("Error processing video:", err)
+      toast({
+        title: "Processing Error",
+        description: "Failed to process the recording. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsProcessing(false)
+      setProcessProgress(0)
+    }
+  }
 
-  // ... Rest of your existing JSX code remains the same ...
-
+  // Loading state
   if (isLoading) {
     return (
       <motion.div
@@ -406,6 +439,23 @@ export default function MockInterviewModal({
     )
   }
 
+  // Processing state
+  if (isProcessing) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center"
+      >
+        <div className="bg-background p-8 rounded-lg shadow-lg w-[400px]">
+          <Progress value={processProgress} className="mb-4" />
+          <p className="text-center">Processing recording... {Math.round(processProgress)}%</p>
+        </div>
+      </motion.div>
+    )
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -413,18 +463,22 @@ export default function MockInterviewModal({
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center"
     >
-      <div ref={contentRef} className="bg-background p-8 rounded-lg shadow-lg w-[90vw] h-[90vh] flex flex-col">
-        {/* Header Section */}
+      <div ref={questionContainerRef} className="bg-background p-8 rounded-lg shadow-lg w-[90vw] h-[90vh] flex flex-col">
+        {/* Header */}
         <div className="flex flex-col mb-6">
           <div className="flex justify-between items-start mb-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                  {category}
-                </span>
-                <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                  {complexity}
-                </span>
+                {category && (
+                  <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                    {category}
+                  </span>
+                )}
+                {complexity && (
+                  <span className="text-sm font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                    {complexity}
+                  </span>
+                )}
               </div>
               <h1 className="text-3xl font-bold">
                 {title.split('\n')[0].replace(/^#\s+/, '')}
@@ -436,26 +490,27 @@ export default function MockInterviewModal({
               )}
             </div>
             {!isInterviewStarted && (
-              <Button variant="ghost" size="icon" onClick={handleClose}>
+              <Button variant="ghost" size="icon" onClick={onClose}>
                 <X className="h-6 w-6" />
               </Button>
             )}
           </div>
         </div>
 
+        {/* Main Content */}
         <div className="flex-grow grid grid-cols-5 gap-8">
           {/* Left Panel - Instructions/Questions */}
-          <div className="col-span-3 space-y-6 border rounded-lg p-6 flex flex-col">
+          <div className="content-section col-span-3 space-y-6 border rounded-lg p-6 flex flex-col">
             {!isInterviewStarted ? (
               <div className="flex-grow flex flex-col justify-between">
                 <div className="space-y-6">
                   <div className="prose dark:prose-invert max-w-none">
                     <h2 className="text-xl font-semibold mb-4">Interview Instructions</h2>
                     <ul className="space-y-2 text-sm text-gray-600">
-                      <li>You'll be presented with technical questions about Django MVT Architecture</li>
                       <li>Take a moment to position yourself and check your camera view</li>
                       <li>Each response will be recorded for your review</li>
                       <li>You'll have {Math.floor(timeLeft / 60)} minutes to complete all questions</li>
+                      <li>Ensure you speak clearly and maintain good posture</li>
                     </ul>
                   </div>
 
@@ -465,22 +520,31 @@ export default function MockInterviewModal({
                       <li>Ensure you're in a quiet environment</li>
                       <li>Check your camera position and lighting</li>
                       <li>Test your microphone</li>
+                      <li>Have water nearby if needed</li>
                     </ul>
                   </div>
                 </div>
               </div>
             ) : (
               <>
-                <div className="text-2xl font-semibold flex-grow flex items-center justify-center overflow-y-auto">
+                <div className="text-2xl font-semibold flex-grow overflow-y-auto">
                   <ReactMarkdown className="prose dark:prose-invert">
                     {questions[currentQuestionIndex]?.question || "No question available"}
                   </ReactMarkdown>
                 </div>
-                <div className="flex justify-between">
-                  <Button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0}>
+                <div className="flex justify-between mt-4">
+                  <Button
+                    onClick={handlePreviousQuestion}
+                    disabled={currentQuestionIndex === 0}
+                    variant="outline"
+                  >
                     <ChevronLeft className="mr-2 h-4 w-4" /> Previous
                   </Button>
-                  <Button onClick={handleNextQuestion} disabled={currentQuestionIndex === questions.length - 1}>
+                  <Button
+                    onClick={handleNextQuestion}
+                    disabled={currentQuestionIndex === questions.length - 1}
+                    variant="outline"
+                  >
                     Next <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
@@ -501,8 +565,8 @@ export default function MockInterviewModal({
                 ref={videoRef}
                 autoPlay
                 playsInline
-                muted // Add this to prevent feedback
-                className="w-full h-full object-contain" // Changed from object-cover
+                muted
+                className="w-full h-full object-cover"
                 style={{ transform: 'scaleX(-1)' }}
               />
               {!isStreaming && (
@@ -521,7 +585,6 @@ export default function MockInterviewModal({
             </div>
 
             {/* Controls */}
-            {/* Controls */}
             <div className="flex justify-between items-center">
               <div className="text-2xl font-semibold">
                 {isInterviewStarted ? (
@@ -538,7 +601,10 @@ export default function MockInterviewModal({
                 size="lg"
                 onClick={isInterviewStarted ? handleCompleteInterview : handleStartInterview}
                 disabled={timeLeft === 0 || questions.length === 0 || !isStreaming}
-                className={isInterviewStarted ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600"}
+                className={`${isInterviewStarted
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-blue-500 hover:bg-blue-600"
+                  } text-white`}
               >
                 {isInterviewStarted ? (
                   <>

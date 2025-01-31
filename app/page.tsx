@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import WebcamComponent from '@/components/WebcamComponent';
+import TestCouponGenerator from "@/components/TestCouponGenerator"
 
 const showcaseItems = [
   {
@@ -35,9 +36,9 @@ export default function Home() {
     <div className="container mx-auto px-4 py-8">
       <div className="grid md:grid-cols-2 gap-8 items-center">
         <div>
-          <h1 className="text-4xl font-bold mb-4">Practice Better, 
-Interview Easier
-</h1>
+          <h1 className="text-4xl font-bold mb-4">Practice Better,
+            Interview Easier
+          </h1>
           <p className="text-xl mb-6">
             Create stunning images with the power of AI. Perfect for designers, marketers, and creatives.
           </p>
@@ -120,9 +121,14 @@ Interview Easier
         </div>
 
         <div>
-      <h1>My Webcam App</h1>
-      <WebcamComponent />
-    </div>
+          <h1>My Webcam App</h1>
+          <WebcamComponent />
+        </div>
+        <div>
+          <h1>My Webcam App</h1>
+          <TestCouponGenerator/>
+        </div>
+ 
       </div>
     </div>
   )

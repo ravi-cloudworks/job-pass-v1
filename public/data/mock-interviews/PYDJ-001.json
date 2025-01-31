@@ -5,7 +5,7 @@
   "questions": [
     {
       "id": "q1",
-      "question": "Looking at this MVT Architecture diagram:\n\n![MVT Flow](https://media.geeksforgeeks.org/wp-content/uploads/20211122171829/nikhilimagereedit.jpg)\n\nWhat's missing in the data flow? How would you improve it?"
+      "question": "Looking at this MVT Architecture diagram:\n\n\n\nWhat's missing in the data flow? How would you improve it?"
     },
     {
       "id": "q2", 

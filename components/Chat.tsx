@@ -186,7 +186,7 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
       const aiResponse: ChatMessage = {
         role: "ai",
         type: "image-generation",
-        content: `Your AI interview for ${categoryPath} with ${pendingComplexity} complexity has been generated successfully! You can find it in the gallery.`,
+        content: `Your AI interview for ${categoryPath} with ${pendingComplexity} complexity has been generated successfully! You can find "New" in Success Vault.`,
         options: ["start_over"],
         questionSetId: questionSetId,
         complexity: pendingComplexity,
