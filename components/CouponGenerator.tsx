@@ -17,6 +17,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import ReactDOM from 'react-dom';
+import { Root, createRoot } from 'react-dom/client';
+import confetti from 'canvas-confetti';
 
 interface Coupon {
   code: string;
@@ -50,6 +53,19 @@ const CouponGenerator = () => {
 
   const [isImageUploaded, setIsImageUploaded] = useState(false);
 
+  // Add state for dialog
+  const [showDownloadDialog, setShowDownloadDialog] = useState(false);
+  const [downloadedFile, setDownloadedFile] = useState('');
+
+  const dialogShownRef = useRef(false);
+
+  const [pdfState, setPdfState] = useState<{
+    filename: string;
+    showDialog: boolean;
+  }>({
+    filename: '',
+    showDialog: false
+  });
 
   // Load default background on mount
   useEffect(() => {
@@ -85,17 +101,52 @@ const CouponGenerator = () => {
     return true;
   };
 
-  const generateUniqueCode = async (index: number): Promise<string> => {
-    const now = Date.now();
-    const uniqueTimestamp = now + index;
-    const timestampPart = uniqueTimestamp.toString().slice(-4);
-    const alphanumericChars = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let randomPart = '';
-    for (let i = 0; i < 3; i++) {
-      randomPart += alphanumericChars.charAt(Math.floor(Math.random() * alphanumericChars.length));
+  const generateUniqueCode = async (index: number) => {
+    try {
+      const now = Date.now();
+      const uniqueTimestamp = now + index;
+      const timestampPart = uniqueTimestamp.toString().slice(-4);
+      const alphanumericChars = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+      let randomPart = '';
+      for (let i = 0; i < 3; i++) {
+        randomPart += alphanumericChars.charAt(Math.floor(Math.random() * alphanumericChars.length));
+      }
+      return `${randomPart}${timestampPart}`;
+    } catch (error) {
+      setGeneratedCoupons([]); // Clear on error
+      throw error;
     }
-    return `${randomPart}${timestampPart}`;
   };
+
+  const DownloadConfirmation = React.memo<{
+    filename: string;
+    isOpen: boolean;
+    onClose: () => void;
+  }>(({ filename, isOpen, onClose }) => {
+    return (
+      <AlertDialog open={isOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold">
+              PDF Generated Successfully!
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <div className="text-center mb-4">
+                  <p className="text-lg mb-2">Your PDF has been downloaded as:</p>
+                  <p className="text-xl font-bold text-primary">{filename}</p>
+                </div>
+                <p>Please check your downloads folder.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={onClose}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  });
 
   const clearGeneratedCoupons = () => {
     setGeneratedCoupons([]);
@@ -103,113 +154,93 @@ const CouponGenerator = () => {
     toast.success('Ready to generate new coupons');
   };
 
-  const generatePDF = async () => {
-    if (!couponsGridRef.current) return;
-
+  const generatePDF = async (coupons: Coupon[]) => {
     try {
-      console.log('Starting PDF generation...');
-
-      // Credit card size in mm (standard size: 85.6 × 54 mm)
-      const CARD_WIDTH_MM = 85.6;
-      const CARD_HEIGHT_MM = 54;
-      const A4_WIDTH_MM = 210;
-      const A4_HEIGHT_MM = 297;
-      const MARGIN_MM = 10;
-
-      console.log('Dimensions (mm):', {
-        cardWidth: CARD_WIDTH_MM,
-        cardHeight: CARD_HEIGHT_MM,
-        pageWidth: A4_WIDTH_MM,
-        pageHeight: A4_HEIGHT_MM,
-        margin: MARGIN_MM
-      });
-
-      // Calculate usable area
-      const usableWidth = A4_WIDTH_MM - (2 * MARGIN_MM);
-      const usableHeight = A4_HEIGHT_MM - (2 * MARGIN_MM);
-
-      console.log('Usable area (mm):', {
-        width: usableWidth,
-        height: usableHeight
-      });
-
-      // Calculate grid layout
-      const DPI = 300;
-      const SCALE_FACTOR = DPI / 25.4; // convert mm to pixels
-      const cardWidthPx = CARD_WIDTH_MM * SCALE_FACTOR;
-      const cardHeightPx = CARD_HEIGHT_MM * SCALE_FACTOR;
-
-      console.log('Pixel dimensions:', {
-        cardWidth: cardWidthPx,
-        cardHeight: cardHeightPx,
-        scaleFactor: SCALE_FACTOR
-      });
-
-      console.log('Capturing canvas with html2canvas...');
-      const canvas = await html2canvas(couponsGridRef.current, {
-        scale: 2,
-        width: cardWidthPx * 2, // Two columns
-        height: cardHeightPx * 3, // Three rows
-        logging: true,
-        useCORS: true,
-        backgroundColor: '#ffffff'
-      });
-
-      console.log('Canvas dimensions:', {
-        width: canvas.width,
-        height: canvas.height
-      });
-
-      // Create PDF
-      console.log('Creating PDF...');
+      const CARD_WIDTH = 85.6;
+      const CARD_HEIGHT = 54;
       const pdf = new jsPDF({
-        orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
-        compress: false
+        orientation: 'portrait',
       });
 
-      console.log('PDF dimensions:', {
-        width: pdf.internal.pageSize.getWidth(),
-        height: pdf.internal.pageSize.getHeight()
+      // Set PDF metadata
+      pdf.setProperties({
+        title: 'JobPass Coupons',
+        subject: 'Interview Success Cards',
+        author: 'www.jobpass.com',
+        creator: 'www.jobpass.com',
       });
 
-      // Calculate positioning
-      const xOffset = (A4_WIDTH_MM - usableWidth) / 2;
-      const yOffset = (A4_HEIGHT_MM - usableHeight) / 2;
+      // Add header
+      pdf.setFontSize(10);
+      pdf.setTextColor(100);
+      const topMargin = 10;
+      const leftMargin = 10;
+      pdf.text('Generated by www.jobpass.org', leftMargin, topMargin);
+      pdf.text(`Created: ${format(new Date(), 'dd-MMM-yyyy HH:mm:ss OOOO')}`, leftMargin, topMargin + 5);
+      pdf.line(leftMargin, topMargin + 7, 200, topMargin + 7);
 
-      console.log('Image positioning:', {
-        xOffset,
-        yOffset,
-        width: usableWidth,
-        height: usableHeight
-      });
+      // Start coupon grid after header
+      const MARGIN = 20;
+      const CARDS_PER_ROW = 2;
+      const CARDS_PER_COL = 3;
+      const SPACING = 5;
 
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      for (let i = 0; i < coupons.length; i += 6) {
+        if (i > 0) pdf.addPage();
 
-      // Add image to PDF
-      console.log('Adding image to PDF...');
-      pdf.addImage(imgData, 'JPEG',
-        xOffset, yOffset,
-        usableWidth, usableHeight,
-        undefined,
-        'FAST');
+        for (let row = 0; row < CARDS_PER_COL; row++) {
+          for (let col = 0; col < CARDS_PER_ROW; col++) {
+            const index = i + row * CARDS_PER_ROW + col;
+            if (index >= coupons.length) continue;
 
-      // Generate filename and save
-      const timestamp = format(new Date(), 'yyyyMMdd-HHmmss');
-      const filename = `justpass_${creatorName}_${numCoupons}coupons_${timestamp}.pdf`;
+            const x = MARGIN + col * (CARD_WIDTH + SPACING);
+            const y = MARGIN + row * (CARD_HEIGHT + SPACING);
 
-      console.log('Saving PDF with filename:', filename);
+            const container = document.createElement('div');
+            container.style.cssText = `width:${CARD_WIDTH}mm;height:${CARD_HEIGHT}mm;position:fixed;left:-9999px;background:white;`;
+            document.body.appendChild(container);
+
+            const root = createRoot(container);
+            root.render(<PreviewCard coupon={coupons[index]} />);
+
+            await new Promise((r) => setTimeout(r, 1000));
+
+            const canvas = await html2canvas(container, {
+              scale: 2,
+              useCORS: true,
+              logging: false,
+            });
+
+            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, y, CARD_WIDTH, CARD_HEIGHT);
+
+            root.unmount();
+            document.body.removeChild(container);
+          }
+        }
+      }
+
+      const filename = `justpass_${coupons[0].creator}_${coupons.length}coupons_${format(new Date(), 'yyyyMMdd-HHmmss')}.pdf`;
       pdf.save(filename);
 
-      console.log('PDF generation complete');
-      toast.success('PDF downloaded successfully!');
-      setTimeout(clearGeneratedCoupons, 1000);
+      setPdfState({
+        filename,
+        showDialog: true,
+      });
+
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast.error('Error generating PDF. Please try again.');
+      console.error('PDF Error:', error);
+      toast.error('PDF generation failed');
+      setGeneratedCoupons([]);
     }
   };
+
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -246,11 +277,19 @@ const CouponGenerator = () => {
     setShowConfirmation(true);  // This was missing
   };
 
+  // Clean up states when dialog is closed
+  const handleDialogClose = () => {
+    setPdfState((prev) => ({
+      ...prev,
+      showDialog: false
+    }));
+  };
+
   const generateCoupons = async () => {
     try {
       setIsGenerating(true);
       setProgress(0);
-      setGeneratedCoupons([]);
+      setGeneratedCoupons([]); // Clear before starting
 
       const newCoupons: Coupon[] = [];
 
@@ -264,28 +303,26 @@ const CouponGenerator = () => {
         }
 
         const code = await generateUniqueCode(i);
-        const coupon: Coupon = {
-          code,
-          creator: creatorName,
-          timestamp: new Date().toISOString()
-        };
-
+        const coupon = { code, creator: creatorName, timestamp: new Date().toISOString() };
         newCoupons.push(coupon);
-        setGeneratedCoupons([...newCoupons]);
+        setGeneratedCoupons([...newCoupons]); // Keep this state update
         setProgress(((i + 1) * 100) / numCoupons);
       }
+      console.log('Generated coupons:', newCoupons);
+      await generatePDF(newCoupons);
+      // Clear state only after PDF is complete
+      setTimeout(() => setGeneratedCoupons([]), 1000);
 
-      setTimeout(() => {
-        generatePDF();
-      }, 1000);
     } catch (error) {
-      console.error('Error generating coupons:', error);
-      toast.error('Error generating coupons. Please try again.');
+      console.error('Error:', error);
+      toast.error('Error generating coupons');
+      setGeneratedCoupons([]); // Clear on error
     } finally {
       setIsGenerating(false);
       setShowConfirmation(false);
     }
   };
+
 
   const PreviewCard = ({ coupon }: { coupon?: Coupon }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 85.6 54" className="w-full h-full">
@@ -402,7 +439,7 @@ const CouponGenerator = () => {
                   className={cn(websiteError && "border-red-500")}
                 />
                 {websiteError && (
-                  <p className="text-sm text-red-500">{websiteError}</p>
+                  <div className="text-sm text-red-500">{websiteError}</div>
                 )}
               </div>
 
@@ -439,7 +476,7 @@ const CouponGenerator = () => {
                   </PopoverContent>
                 </Popover>
                 {dateError && (
-                  <p className="text-sm text-red-500">{dateError}</p>
+                  <div className="text-sm text-red-500">{dateError}</div>
                 )}
               </div>
 
@@ -521,37 +558,28 @@ const CouponGenerator = () => {
             {isGenerating && (
               <div className="space-y-2 mb-4">
                 <Progress value={progress} className="w-full" />
-                <p className="text-sm text-muted-foreground">
+                <div className="text-sm text-muted-foreground">
                   Please wait. Each coupon takes 5 seconds to ensure unique generation.
-                </p>
+                </div>
               </div>
             )}
 
             {!isGenerating && !generatedCoupons.length && (
               <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">No coupons generated yet</p>
+                <div className="text-muted-foreground">No coupons generated yet</div>
               </div>
             )}
 
+            {/* Replace the existing couponsGridRef div styling with: */}
             <div
               ref={couponsGridRef}
-              className="grid grid-cols-2 gap-8 bg-white rounded border"
-              style={{
-                width: '190mm', // A4 width minus margins
-                padding: '10mm',
-                margin: '0 auto',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, 85.6mm)', // Exact credit card width
-                gridGap: '10mm',
-              }}
+              className="grid grid-cols-2 gap-4 bg-white rounded border p-4 mx-auto w-full"
             >
               {generatedCoupons.map((coupon) => (
                 <div
                   key={coupon.code}
+                  className="aspect-[1.585] w-full border-2 border-dashed border-gray-200"
                   style={{
-                    width: '85.6mm',
-                    height: '54mm', // Exact credit card height
-                    border: '2px dashed #e2e2e2',
                     pageBreakInside: 'avoid',
                     breakInside: 'avoid',
                   }}
@@ -566,19 +594,37 @@ const CouponGenerator = () => {
 
       {/* Confirmation Dialog */}
       <AlertDialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-white p-6 rounded-lg max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Coupon Generation</AlertDialogTitle>
-            <AlertDialogDescription>
-              {numCoupons} coupons × 30 minutes = {numCoupons * 30} minutes will be deducted from your account.
+            <AlertDialogTitle className="text-xl font-bold mb-4">
+              Below minutes will be deducted from your account:
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-2xl font-bold">{numCoupons} coupons × 30 minutes = </span>
+                  <span className="text-3xl font-bold text-primary">{numCoupons * 30} minutes</span>
+                </div>
+                <p className="text-sm text-gray-600 underline">
+                  This action cannot be reversed
+                </p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="mt-6">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={generateCoupons}>Agree</AlertDialogAction>
+            <AlertDialogAction onClick={generateCoupons}>I Agree</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {pdfState.showDialog && (
+        <DownloadConfirmation
+          filename={pdfState.filename}
+          isOpen={pdfState.showDialog}
+          onClose={handleDialogClose}
+        />
+      )}
 
       {/* Print Styles */}
       <style jsx global>{`
