@@ -148,10 +148,39 @@ export default function MockInterviewModal({
     const fetchQuestions = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch(`./data/mock-interviews/${questionSetId}.json`)
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+        console.log("Fetching questions for ID:", questionSetId)
+        
+        // Try with and without leading slash
+        const urls = [
+          `/data/mock-interviews/${questionSetId}.json`,
+          `data/mock-interviews/${questionSetId}.json`,
+          `./data/mock-interviews/${questionSetId}.json`
+        ]
+        
+        let response = null
+        let successUrl = ''
+        
+        for (const url of urls) {
+          try {
+            console.log("Attempting to fetch from:", url)
+            response = await fetch(url)
+            if (response.ok) {
+              successUrl = url
+              break
+            }
+          } catch (err) {
+            console.log("Failed to fetch from:", url, err)
+          }
+        }
 
+        if (!response || !response.ok) {
+          throw new Error(`Failed to fetch from any URL. Last status: ${response?.status}`)
+        }
+
+        console.log("Successfully fetched from:", successUrl)
         const data: QuestionSet = await response.json()
+        console.log("Fetched data:", data)
+        
         setQuestions(data.questions)
         setTitle(data.title)
         setTimeLeft(data.time_limit)

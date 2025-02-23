@@ -39,7 +39,7 @@ export default function Header() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
                 <Link href="/coupons" className="w-full">
-                  Generate Coupons
+                  Generate Prepaid Cards
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
