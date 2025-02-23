@@ -136,7 +136,8 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
         role: "ai",
         type: "payment-options",
         content: "Insufficient minutes remaining. Please choose a payment option:",
-        options: ["use_prepaid_code", "instant_buy"]
+        // options: ["use_prepaid_code", "instant_buy"]
+        options: ["use_prepaid_code"]
       }
       setChatHistory(prev => [...prev, paymentOptionsMessage])
       setPendingComplexity(selectedComplexity)
@@ -254,7 +255,8 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
         const errorMessage: ChatMessage = {
           role: "ai",
           content: "Invalid prepaid code. Please try again.",
-          options: ["use_prepaid_code", "instant_buy"],
+          // options: ["use_prepaid_code", "instant_buy"],
+          options: ["use_prepaid_code"],
         }
         setChatHistory(prev => [...prev, errorMessage])
       }
