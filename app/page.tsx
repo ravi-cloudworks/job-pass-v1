@@ -120,14 +120,14 @@ export default function Home() {
           ))}
         </div>
 
-        <div>
+        {/* <div>
           <h1>My Webcam App</h1>
           <WebcamComponent />
         </div>
         <div>
           <h1>My Webcam App</h1>
           <TestCouponGenerator/>
-        </div>
+        </div> */}
  
       </div>
     </div>

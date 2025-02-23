@@ -221,126 +221,84 @@ export default function MockInterviewModal({
   }
 
   // Start recording
-  const startRecording = async () => {
-    if (!streamRef.current) return
+  const startScreenRecording = async () => {
+    if (!questionContainerRef.current) return
 
-    setInterviewStartTime(Date.now())
+    try {
+      // Get screen capture stream
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: "window" },
+        audio: true
+      })
 
-    // Take initial snapshot
-    const initialSnapshot = await takeSnapshot()
-    if (initialSnapshot) {
-      setQuestionSnapshots([initialSnapshot])
-    }
+      // Get microphone stream
+      const micStream = await navigator.mediaDevices.getUserMedia({
+        audio: true
+      })
 
-    // Setup MediaRecorder for webcam
-    const mediaRecorder = new MediaRecorder(streamRef.current, {
-      mimeType: 'video/webm;codecs=vp9,opus',
-      videoBitsPerSecond: VIDEO_CONFIG.BITRATE
-    })
+      // Create a new composed stream
+      const composedStream = new MediaStream()
 
-    mediaRecorderRef.current = mediaRecorder
-    webcamChunks.current = []
+      // Add the screen video track
+      screenStream.getVideoTracks().forEach((videoTrack) => {
+        composedStream.addTrack(videoTrack)
+      })
 
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        webcamChunks.current.push(event.data)
-      }
-    }
+      // Create audio context to mix audio streams
+      const audioContext = new AudioContext()
+      const destination = audioContext.createMediaStreamDestination()
 
-    mediaRecorder.start(1000)
-    setIsInterviewStarted(true)
-  }
-
-  // Process final video
-  const processVideo = async (webcamBlob: Blob, snapshots: QuestionSnapshot[]) => {
-    const canvas = document.createElement('canvas')
-    canvas.width = VIDEO_CONFIG.WIDTH
-    canvas.height = VIDEO_CONFIG.HEIGHT
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error("Could not get canvas context")
-
-    const videoElement = document.createElement('video')
-    videoElement.src = URL.createObjectURL(webcamBlob)
-    await new Promise(resolve => {
-      videoElement.onloadedmetadata = resolve
-    })
-    videoElement.currentTime = 0
-
-    const totalFrames = Math.ceil(videoElement.duration * VIDEO_CONFIG.FPS)
-    let processedFrames = 0
-
-    const finalStream = canvas.captureStream(VIDEO_CONFIG.FPS)
-    const finalRecorder = new MediaRecorder(finalStream, {
-      mimeType: 'video/webm;codecs=vp9,opus'
-    })
-
-    const finalChunks: Blob[] = []
-    finalRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) finalChunks.push(e.data)
-    }
-
-    return new Promise<string>((resolve, reject) => {
-      finalRecorder.onstop = () => {
-        const finalBlob = new Blob(finalChunks, { type: 'video/webm' })
-        const url = URL.createObjectURL(finalBlob)
-        resolve(url)
+      // Add screen audio if available
+      if (screenStream.getAudioTracks().length > 0) {
+        const screenSource = audioContext.createMediaStreamSource(screenStream)
+        const screenGain = audioContext.createGain()
+        screenGain.gain.value = 1.0
+        screenSource.connect(screenGain).connect(destination)
       }
 
-      const processFrame = async () => {
-        if (videoElement.currentTime >= videoElement.duration) {
-          finalRecorder.stop()
-          return
+      // Add microphone audio
+      const micSource = audioContext.createMediaStreamSource(micStream)
+      const micGain = audioContext.createGain()
+      micGain.gain.value = 1.0
+      micSource.connect(micGain).connect(destination)
+
+      // Add the combined audio to the composed stream
+      destination.stream.getAudioTracks().forEach((audioTrack) => {
+        composedStream.addTrack(audioTrack)
+      })
+
+      // Setup MediaRecorder with the composed stream
+      const mediaRecorder = new MediaRecorder(composedStream, {
+        mimeType: 'video/webm;codecs=vp9,opus'
+      })
+
+      mediaRecorderRef.current = mediaRecorder
+      webcamChunks.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          webcamChunks.current.push(event.data)
         }
-      
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-      
-        // Draw question section (left side)
-        const currentTime = videoElement.currentTime * 1000
-        const currentSnapshot = snapshots.reduce((prev, curr) => {
-          return (curr.timestamp <= currentTime && curr.timestamp > prev.timestamp) ? curr : prev
-        }, snapshots[0])
-      
-        ctx.drawImage(currentSnapshot.imageData, 0, 0)
-      
-        // Calculate webcam dimensions maintaining 4:3 aspect ratio
-        const maxWidth = canvas.width * VIDEO_CONFIG.WEBCAM_SCALE
-        const maxHeight = canvas.height * 0.4 // Limit height to 40% of canvas
-      
-        // Get actual video dimensions
-        const videoRatio = videoElement.videoWidth / videoElement.videoHeight
-        let finalWidth, finalHeight
-      
-        if (videoRatio > 4/3) {
-          // Video is wider than 4:3
-          finalWidth = maxWidth
-          finalHeight = maxWidth * (3/4)
-        } else {
-          // Video is taller than 4:3
-          finalHeight = maxHeight
-          finalWidth = maxHeight * (4/3)
-        }
-      
-        const webcamX = canvas.width - finalWidth - 20
-        const webcamY = 20
-      
-        // Draw webcam with corrected dimensions
-        ctx.save()
-        ctx.translate(webcamX + finalWidth, webcamY)
-        ctx.scale(-1, 1)
-        ctx.drawImage(videoElement, 0, 0, finalWidth, finalHeight)
-        ctx.restore()
-      
-        processedFrames++
-        setProcessProgress((processedFrames / totalFrames) * 100)
-      
-        videoElement.currentTime += 1 / VIDEO_CONFIG.FPS
-        requestAnimationFrame(processFrame)
       }
 
-      finalRecorder.start()
-      processFrame()
-    })
+      // Start recording
+      mediaRecorder.start(1000)
+      setInterviewStartTime(Date.now())
+      setIsInterviewStarted(true)
+
+      // Setup cleanup when screen share stops
+      screenStream.getVideoTracks()[0].onended = () => {
+        handleCompleteInterview()
+      }
+
+    } catch (err) {
+      console.error("Error starting screen recording:", err)
+      toast({
+        title: "Recording Error",
+        description: "Failed to start screen recording. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   // Handle question navigation
@@ -382,7 +340,7 @@ export default function MockInterviewModal({
       setError("No questions available")
       return
     }
-    await startRecording()
+    await startScreenRecording()
   }
 
   const handleCompleteInterview = async () => {
@@ -393,12 +351,8 @@ export default function MockInterviewModal({
     setIsProcessing(true)
   
     try {
-      const webcamBlob = new Blob(webcamChunks.current, { type: 'video/webm' })
-      console.log("Created webcam blob, size:", webcamBlob.size) // Debug log
-  
-      const finalVideoUrl = await processVideo(webcamBlob, questionSnapshots)
-      console.log("Question snapshots count:", questionSnapshots.length) // Debug log
-      console.log("Snapshots timestamps:", questionSnapshots.map(s => s.timestamp)) // Debug log
+      const finalBlob = new Blob(webcamChunks.current, { type: 'video/webm' })
+      const finalVideoUrl = URL.createObjectURL(finalBlob)
   
       // Force download
       const a = document.createElement('a')
@@ -407,6 +361,11 @@ export default function MockInterviewModal({
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
+  
+      // Cleanup streams
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop())
+      }
   
       onComplete(finalVideoUrl)
     } catch (err) {

@@ -33,7 +33,7 @@ import { Label } from "@/components/ui/label"
 interface ChatMessage {
   role: "ai" | "user";
   content: string;
-  type?: "text" | "qr-payment" | "image-generation";
+  type?: "text" | "qr-payment" | "image-generation" | "payment-options";
   options?: string[];
   qrData?: {
     amount: number;
@@ -52,21 +52,29 @@ interface ChatProps {
 const COMPLEXITY_MINUTES = {
   Easy: 15,
   Medium: 30,
-  Strong: 45
+  Hard: 45
 }
 
-
+const validatePrepaidCode = async (code: string): Promise<boolean> => {
+  // Dummy validation that always returns true
+  // TODO: Replace with actual validation logic
+  await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call delay
+  return true;
+}
 
 export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [currentNode, setCurrentNode] = useState<ChatbotNode>(getNode("root"))
   const [isAiThinking, setIsAiThinking] = useState(false)
   const [selectedQR, setSelectedQR] = useState<string | null>(null)
-  const [remainingMinutes, setRemainingMinutes] = useState(120) // 2 hours in minutes
+  const [remainingMinutes, setRemainingMinutes] = useState(15) // 2 hours in minutes
   const [complexity, setComplexity] = useState<string | null>(null)
   const [showConfirmation, setShowConfirmation] = useState(false)
   const [pendingComplexity, setPendingComplexity] = useState<string | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const [showPrepaidCodeDialog, setShowPrepaidCodeDialog] = useState(false)
+  const [prepaidCode, setPrepaidCode] = useState("")
+  const [showQRDialog, setShowQRDialog] = useState(false)
 
   useEffect(() => {
     // Initialize chat with the root question
@@ -124,21 +132,27 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
     const requiredMinutes = COMPLEXITY_MINUTES[selectedComplexity as keyof typeof COMPLEXITY_MINUTES]
 
     if (remainingMinutes < requiredMinutes) {
-      const paymentMessage: ChatMessage = {
+      const paymentOptionsMessage: ChatMessage = {
         role: "ai",
-        type: "qr-payment",
-        content: "Insufficient minutes remaining. Please purchase more time to continue.",
-        qrData: {
-          amount: 10,
-          paymentUrl: "./placeholder.svg?height=200&width=200&text=Sample+QR+Code",
-        },
+        type: "payment-options",
+        content: "Insufficient minutes remaining. Please choose a payment option:",
+        options: ["use_prepaid_code", "instant_buy"]
       }
-      setChatHistory(prev => [...prev, paymentMessage])
+      setChatHistory(prev => [...prev, paymentOptionsMessage])
+      setPendingComplexity(selectedComplexity)
       return
     }
 
     setPendingComplexity(selectedComplexity)
     setShowConfirmation(true)
+  }
+
+  const handlePaymentOption = async (option: string) => {
+    if (option === "use_prepaid_code") {
+      setShowPrepaidCodeDialog(true)
+    } else if (option === "instant_buy") {
+      setShowQRDialog(true)
+    }
   }
 
   const handleConfirmation = async (confirmed: boolean) => {
@@ -205,6 +219,50 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
     }
   }
 
+  const handlePrepaidCodeSubmit = async () => {
+    try {
+      const isValidCode = await validatePrepaidCode(prepaidCode)
+      
+      if (isValidCode) {
+        setShowPrepaidCodeDialog(false)
+        setPrepaidCode("")
+        
+        // Calculate new remaining minutes
+        const newRemainingMinutes = remainingMinutes + 30
+        setRemainingMinutes(newRemainingMinutes)
+        
+        // Use the new value directly when checking
+        if (pendingComplexity) {
+          const requiredMinutes = COMPLEXITY_MINUTES[pendingComplexity as keyof typeof COMPLEXITY_MINUTES]
+          
+          if (newRemainingMinutes >= requiredMinutes) {
+            setPendingComplexity(pendingComplexity)
+            setShowConfirmation(true)
+          } else {
+            const paymentOptionsMessage: ChatMessage = {
+              role: "ai",
+              type: "payment-options",
+              content: "Insufficient minutes remaining. Please choose a payment option:",
+              // options: ["use_prepaid_code", "instant_buy"]
+              options: ["use_prepaid_code"]
+            }
+            setChatHistory(prev => [...prev, paymentOptionsMessage])
+          }
+        }
+      } else {
+        // Show error message
+        const errorMessage: ChatMessage = {
+          role: "ai",
+          content: "Invalid prepaid code. Please try again.",
+          options: ["use_prepaid_code", "instant_buy"],
+        }
+        setChatHistory(prev => [...prev, errorMessage])
+      }
+    } catch (error) {
+      console.error("Error validating prepaid code:", error)
+    }
+  }
+
   
   const formatMinutes = (minutes: number) => {
     const hours = Math.floor(minutes / 60)
@@ -261,13 +319,21 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
                           variant="outline"
                           size="sm"
                           className="w-full text-left justify-start"
-                          onClick={() =>
-                            option === "Easy" || option === "Medium" || option === "Hard"
-                              ? handleComplexitySelection(option)
-                              : handleOptionClick(option)
-                          }
+                          onClick={() => {
+                            if (option === "use_prepaid_code" || option === "instant_buy") {
+                              handlePaymentOption(option)
+                            } else if (option === "Easy" || option === "Medium" || option === "Hard") {
+                              handleComplexitySelection(option)
+                            } else {
+                              handleOptionClick(option)
+                            }
+                          }}
                         >
-                          {getOptionText(option)}
+                          {option === "use_prepaid_code" 
+                            ? "Use Prepaid Code" 
+                            : option === "instant_buy" 
+                              ? "Instant Buy" 
+                              : getOptionText(option)}
                         </Button>
                       ))}
                     </div>
@@ -325,6 +391,62 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
             >
               Generate Interview
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showPrepaidCodeDialog} onOpenChange={setShowPrepaidCodeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enter Prepaid Code</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please enter your prepaid code to add more minutes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="prepaid-code" className="text-right">
+                Code
+              </Label>
+              <input
+                id="prepaid-code"
+                value={prepaidCode}
+                onChange={(e) => setPrepaidCode(e.target.value)}
+                className="col-span-3 p-2 border rounded"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowPrepaidCodeDialog(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handlePrepaidCodeSubmit}>
+              Submit
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showQRDialog} onOpenChange={setShowQRDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Purchase More Time</AlertDialogTitle>
+            <AlertDialogDescription>
+              Scan this QR code to add more minutes to your account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex flex-col items-center justify-center py-4">
+            <img
+              src="./placeholder.svg?height=200&width=200&text=Sample+QR+Code"
+              alt="Payment QR Code"
+              className="w-64 h-64"
+            />
+            <p className="text-sm text-gray-500 mt-2">Amount: $10</p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowQRDialog(false)}>
+              Close
+            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
