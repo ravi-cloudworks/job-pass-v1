@@ -262,22 +262,25 @@ export default function ViewCompleteMockInterviewModal({
                       </div>
                       
                       <div className="space-y-2">
-                        <h3 className="font-medium">Step 1: Login Process</h3>
+                        <h3 className="font-medium">Step 1: Login Process (TWO SCREENS)</h3>
                         <ul className="list-disc pl-5 space-y-1 text-sm">
                           <li>Click "Sign in with Google" button</li>
-                          <li>When asked to "Choose an account", select your <strong>YouTube brand account</strong> (not your personal Gmail)</li>
-                          <li>If you only see your Gmail account, you may need to create a YouTube channel first</li>
+                          <li><strong>First screen</strong>: Choose your Google account</li>
+                          <li><strong>Second screen</strong>: You'll see two options - your email account and YouTube account</li>
+                          <li><strong className="text-red-500">IMPORTANT: You MUST select the YouTube option</strong>, not your email</li>
+                          <li>Selecting your email account instead of YouTube will cause an authorization error</li>
                         </ul>
                       </div>
                       
                       <div className="space-y-2">
                         <h3 className="font-medium">Step 2: Creating a YouTube Channel (if needed)</h3>
                         <ul className="list-disc pl-5 space-y-1 text-sm">
+                          <li>If you don't see a YouTube option on the second screen, you need to create a channel first</li>
                           <li>Visit <a href="https://www.youtube.com" target="_blank" className="text-blue-500 underline">YouTube.com</a></li>
                           <li>Sign in with your Google account</li>
                           <li>Click on your profile picture → Create a channel</li>
                           <li>Follow the prompts to complete channel creation</li>
-                          <li>Return to this page and try again with your new YouTube account</li>
+                          <li>Return to this page and try again - you should now see two options on the second screen</li>
                         </ul>
                       </div>
                     </div>

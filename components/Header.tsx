@@ -32,7 +32,7 @@ export default function Header() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-1">
-                Partner
+                Expert
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
