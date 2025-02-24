@@ -74,6 +74,8 @@ export default function MockInterviewModal({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const webcamChunks = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
+  const screenStreamRef = useRef<MediaStream | null>(null)
+  const composedStreamRef = useRef<MediaStream | null>(null)
 
   // Initialize camera
   const initializeCamera = async () => {
@@ -256,9 +258,14 @@ export default function MockInterviewModal({
     try {
       // Get screen capture stream
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: "window" },
-        audio: true
-      })
+        video: true,
+        audio: true,
+        preferCurrentTab: true,
+        systemAudio: 'include'
+      } as DisplayMediaStreamOptions)
+
+      // Store screen stream reference
+      screenStreamRef.current = screenStream
 
       // Get microphone stream
       const micStream = await navigator.mediaDevices.getUserMedia({
@@ -295,6 +302,9 @@ export default function MockInterviewModal({
       destination.stream.getAudioTracks().forEach((audioTrack) => {
         composedStream.addTrack(audioTrack)
       })
+
+      // Store the composed stream reference
+      composedStreamRef.current = composedStream
 
       // Setup MediaRecorder with the composed stream
       const mediaRecorder = new MediaRecorder(composedStream, {
@@ -383,6 +393,27 @@ export default function MockInterviewModal({
       const finalBlob = new Blob(webcamChunks.current, { type: 'video/webm' })
       const finalVideoUrl = URL.createObjectURL(finalBlob)
   
+      // Stop all media tracks
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => {
+          track.stop()
+        })
+        screenStreamRef.current = null
+      }
+
+      if (composedStreamRef.current) {
+        composedStreamRef.current.getTracks().forEach(track => {
+          track.stop()
+        })
+        composedStreamRef.current = null
+      }
+
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => {
+          track.stop()
+        })
+      }
+  
       // Force download
       const a = document.createElement('a')
       a.href = finalVideoUrl
@@ -390,11 +421,6 @@ export default function MockInterviewModal({
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-  
-      // Cleanup streams
-      if (mediaRecorderRef.current.stream) {
-        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop())
-      }
   
       onComplete(finalVideoUrl)
     } catch (err) {
@@ -409,6 +435,25 @@ export default function MockInterviewModal({
       setProcessProgress(0)
     }
   }
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      // Cleanup all streams on unmount
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => {
+          track.stop()
+        })
+        screenStreamRef.current = null
+      }
+      if (composedStreamRef.current) {
+        composedStreamRef.current.getTracks().forEach(track => {
+          track.stop()
+        })
+        composedStreamRef.current = null
+      }
+    }
+  }, [])
 
   // Loading state
   if (isLoading) {
