@@ -81,7 +81,7 @@ const CouponGenerator = () => {
 
   const validateWebsite = (url: string) => {
     if (url.length > 30) {
-      setWebsiteError('URL must not exceed 30 characters');
+      setWebsiteError('URL must not exceed 30 characters.');
       return false;
     }
     setWebsiteError('');
