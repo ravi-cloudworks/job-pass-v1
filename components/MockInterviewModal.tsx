@@ -414,13 +414,13 @@ export default function MockInterviewModal({
         })
       }
   
-      // Force download
-      const a = document.createElement('a')
-      a.href = finalVideoUrl
-      a.download = `interview-${Date.now()}.webm`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
+      // // Force download
+      // const a = document.createElement('a')
+      // a.href = finalVideoUrl
+      // a.download = `interview-${Date.now()}.webm`
+      // document.body.appendChild(a)
+      // a.click()
+      // document.body.removeChild(a)
   
       onComplete(finalVideoUrl)
     } catch (err) {

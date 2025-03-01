@@ -159,7 +159,7 @@ export default function ViewCompleteMockInterviewModal({
             action: (
               <Button 
                 variant="outline" 
-                onClick={() => window.open('https://www.youtube.com', '_blank')}
+                onClick={() => window.open('https://www.youtube.com/create_channel', '_blank')}
                 className="flex items-center"
               >
                 <ExternalLink className="mr-1 h-4 w-4" />

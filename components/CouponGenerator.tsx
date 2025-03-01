@@ -545,7 +545,7 @@ const CouponGenerator = () => {
               onClick={handleGenerateClick}
               disabled={isGenerating || !creatorName || !websiteUrl || !validUntil || !isImageUploaded}
             >
-              {isGenerating ? 'Generating...' : 'Generate Prepaid Cards'}
+              {isGenerating ? 'Generating...' : 'Generate Interview Cards'}
             </Button>
           </CardContent>
         </Card>
@@ -570,7 +570,7 @@ const CouponGenerator = () => {
         <Card className="h-full flex flex-col">
           <CardContent className="flex-1 p-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Generated Prepaid Cards</h2>
+              <h2 className="text-lg font-semibold">Generated Interview Cards</h2>
               {isGenerating && (
                 <span className="text-sm text-muted-foreground">
                   {generatedCoupons.length} of {numCoupons} generated
@@ -582,14 +582,14 @@ const CouponGenerator = () => {
               <div className="space-y-2 mb-4">
                 <Progress value={progress} className="w-full" />
                 <div className="text-sm text-muted-foreground">
-                  Please wait till the prepaid cards are generated. 
+                  Please wait till the Interview Cards are generated. 
                 </div>
               </div>
             )}
 
             {!isGenerating && !generatedCoupons.length && (
               <div className="flex items-center justify-center h-full">
-                <div className="text-muted-foreground">No Prepaid Cards generated yet</div>
+                <div className="text-muted-foreground">No Interview Cards generated yet</div>
               </div>
             )}
 

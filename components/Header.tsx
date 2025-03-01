@@ -21,13 +21,13 @@ export default function Header() {
             Docs
           </Link>
           <Link href="/pricing" className="hover:underline">
-            Pricing
+            Job Maps
           </Link>
           <Link href="/about" className="hover:underline">
             About
           </Link>
           <Link href="/chat" className="hover:underline">
-            AI Chat
+            AI Interview Assitant
           </Link>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -39,7 +39,7 @@ export default function Header() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
                 <Link href="/coupons" className="w-full">
-                  Generate Prepaid Cards
+                  Generate Interview Cards
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>

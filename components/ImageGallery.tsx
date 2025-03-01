@@ -202,7 +202,7 @@ export default function ImageGallery({
   return (
     <div className="flex flex-col h-full">
       <div className="flex justify-between items-center p-4 border-b">
-        <h2 className="text-lg font-semibold">Success Vault</h2>
+        <h2 className="text-lg font-semibold">Assessment Vault</h2>
         {/* <Select value={filter} onValueChange={onFilterChange}>
           <SelectTrigger className="w-[120px]">
             <SelectValue placeholder="Filter" />
