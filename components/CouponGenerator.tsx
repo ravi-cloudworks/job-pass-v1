@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -127,16 +127,16 @@ const CouponGenerator = () => {
       <AlertDialog open={isOpen}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-bold">
+            <AlertDialogTitle className="text-lg font-semibold">
               PDF Generated Successfully!
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
-                <div className="text-center mb-4">
-                  <p className="text-lg mb-2">Your PDF has been downloaded as:</p>
-                  <p className="text-xl font-bold text-primary">{filename}</p>
+                <div className="text-center mb-3">
+                  <p className="text-sm mb-1">Your PDF has been downloaded as:</p>
+                  <p className="text-base font-semibold text-primary">{filename}</p>
                 </div>
-                <p>Please check your downloads folder.</p>
+                <p className="text-sm">Please check your downloads folder.</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -284,7 +284,7 @@ const CouponGenerator = () => {
     }
 
     // If all validations pass, show confirmation dialog
-    setShowConfirmation(true);  // This was missing
+    setShowConfirmation(true);
   };
 
   // Clean up states when dialog is closed
@@ -416,15 +416,18 @@ const CouponGenerator = () => {
   );
 
   return (
-    <div className="relative flex h-full w-full">
+    <div className="relative flex h-full w-full bg-background">
       {/* Left Section - Input Forms */}
-      <div className="w-[30%] h-full p-4 border-r">
-        <Card className="h-full overflow-auto">
-          <CardContent className="space-y-6 p-4">
+      <div className="w-[30%] h-full p-3 border-r">
+        <Card className="h-full overflow-auto shadow-sm">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-base font-medium">Interview Card Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 p-4">
             {/* Group 1 */}
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="numCoupons">Number of Coupons (Max {MAX_COUPONS})</Label>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="numCoupons" className="text-xs font-medium">Number of Cards (Max {MAX_COUPONS})</Label>
                 <Input
                   id="numCoupons"
                   type="number"
@@ -435,23 +438,26 @@ const CouponGenerator = () => {
                     const value = Math.min(parseInt(e.target.value) || 1, MAX_COUPONS);
                     setNumCoupons(value);
                   }}
+                  className="h-8"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="creatorName">Price</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="creatorName" className="text-xs font-medium">Price</Label>
                 <Input
                   id="creatorName"
                   value={creatorName}
                   onChange={(e) => setCreatorName(e.target.value)}
+                  className="h-8"
+                  placeholder="Enter price (e.g. $199)"
                 />
               </div>
             </div>
 
             {/* Group 2 */}
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Website URL (max 30 characters)</Label>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Website URL (max 30 characters)</Label>
                 <Input
                   value={websiteUrl}
                   onChange={(e) => {
@@ -459,26 +465,27 @@ const CouponGenerator = () => {
                     setWebsiteUrl(newUrl);
                     validateWebsite(newUrl);
                   }}
-                  className={cn(websiteError && "border-red-500")}
+                  className={cn("h-8", websiteError && "border-red-500")}
+                  placeholder="www.example.com"
                 />
                 {websiteError && (
-                  <div className="text-sm text-red-500">{websiteError}</div>
+                  <div className="text-xs text-red-500 mt-1">{websiteError}</div>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label>Valid Until Date</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Valid Until Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
-                        "w-full justify-start text-left font-normal",
+                        "w-full justify-start text-left font-normal h-8 text-sm",
                         !validUntil && "text-muted-foreground",
                         dateError && "border-red-500"
                       )}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      <CalendarIcon className="mr-2 h-3.5 w-3.5" />
                       {validUntil ? format(validUntil, 'dd-MMM-yyyy').toUpperCase() : 'Select date'}
                     </Button>
                   </PopoverTrigger>
@@ -499,49 +506,51 @@ const CouponGenerator = () => {
                   </PopoverContent>
                 </Popover>
                 {dateError && (
-                  <div className="text-sm text-red-500">{dateError}</div>
+                  <div className="text-xs text-red-500 mt-1">{dateError}</div>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label>Text Color</Label>
-                <div className="flex gap-4 items-center">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Text Color</Label>
+                <div className="flex gap-3 items-center">
                   <Input
                     type="color"
                     value={textColor}
                     onChange={(e) => setTextColor(e.target.value)}
-                    className="w-20 h-10 p-1 cursor-pointer"
+                    className="w-16 h-8 p-1 cursor-pointer"
                   />
-                  <span className="text-sm text-gray-500">{textColor}</span>
+                  <span className="text-xs text-gray-500">{textColor}</span>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Validity Box Color</Label>
-                <div className="flex gap-4 items-center">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Validity Box Color</Label>
+                <div className="flex gap-3 items-center">
                   <Input
                     type="color"
                     value={validityBoxColor}
                     onChange={(e) => setValidityBoxColor(e.target.value)}
-                    className="w-20 h-10 p-1 cursor-pointer"
+                    className="w-16 h-8 p-1 cursor-pointer"
                   />
-                  <span className="text-sm text-gray-500">{validityBoxColor}</span>
+                  <span className="text-xs text-gray-500">{validityBoxColor}</span>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Background Image</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Background Image</Label>
                 <Input
                   type="file"
                   accept="image/*"
-                  onChange={handleImageUpload}  // Use this instead of inline function
-                  className="cursor-pointer"
+                  onChange={handleImageUpload}
+                  className="cursor-pointer text-xs h-9 py-1.5"
                 />
+                <p className="text-xs text-muted-foreground mt-1">Upload an image for the card background</p>
               </div>
             </div>
 
             <Button
-              className="w-full mt-6"
+              className="w-full mt-4"
+              size="sm"
               onClick={handleGenerateClick}
               disabled={isGenerating || !creatorName || !websiteUrl || !validUntil || !isImageUploaded}
             >
@@ -552,56 +561,57 @@ const CouponGenerator = () => {
       </div>
 
       {/* Middle Section - Preview */}
-      <div className="w-[35%] h-full p-4 border-r">
-        <Card className="h-full flex flex-col">
-          <CardContent className="flex-1 p-4">
-            <h2 className="text-lg font-semibold mb-4">Preview</h2>
-            <div className="flex items-center justify-center h-full">
-              <div className="w-full max-w-md aspect-[1.585]">
-                <PreviewCard />
-              </div>
+      <div className="w-[35%] h-full p-3 border-r">
+        <Card className="h-full flex flex-col shadow-sm">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-base font-medium">Preview</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 p-4 flex items-center justify-center">
+            <div className="w-full max-w-md aspect-[1.585]">
+              <PreviewCard />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Right Section - Generated Coupons */}
-      <div className="w-[35%] h-full p-4">
-        <Card className="h-full flex flex-col">
-          <CardContent className="flex-1 p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Generated Interview Cards</h2>
+      <div className="w-[35%] h-full p-3">
+        <Card className="h-full flex flex-col shadow-sm">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-base font-medium">Generated Interview Cards</CardTitle>
               {isGenerating && (
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   {generatedCoupons.length} of {numCoupons} generated
                 </span>
               )}
             </div>
-
+          </CardHeader>
+          
+          <CardContent className="flex-1 p-4 overflow-auto">
             {isGenerating && (
               <div className="space-y-2 mb-4">
-                <Progress value={progress} className="w-full" />
-                <div className="text-sm text-muted-foreground">
-                  Please wait till the Interview Cards are generated. 
+                <Progress value={progress} className="w-full h-2" />
+                <div className="text-xs text-muted-foreground">
+                  Please wait while the Interview Cards are being generated.
                 </div>
               </div>
             )}
 
             {!isGenerating && !generatedCoupons.length && (
               <div className="flex items-center justify-center h-full">
-                <div className="text-muted-foreground">No Interview Cards generated yet</div>
+                <div className="text-sm text-muted-foreground">No Interview Cards generated yet</div>
               </div>
             )}
 
-            {/* Replace the existing couponsGridRef div styling with: */}
             <div
               ref={couponsGridRef}
-              className="grid grid-cols-2 gap-4 bg-white rounded border p-4 mx-auto w-full"
+              className="grid grid-cols-2 gap-3 bg-white rounded border p-3 mx-auto w-full"
             >
               {generatedCoupons.map((coupon) => (
                 <div
                   key={coupon.code}
-                  className="aspect-[1.585] w-full border-2 border-dashed border-gray-200"
+                  className="aspect-[1.585] w-full border border-dashed border-gray-200"
                   style={{
                     pageBreakInside: 'avoid',
                     breakInside: 'avoid',
@@ -617,26 +627,26 @@ const CouponGenerator = () => {
 
       {/* Confirmation Dialog */}
       <AlertDialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <AlertDialogContent className="bg-white p-6 rounded-lg max-w-md">
+        <AlertDialogContent className="bg-white p-5 rounded-lg max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-bold mb-4">
-              Below minutes will be deducted from your account:
+            <AlertDialogTitle className="text-base font-semibold mb-2">
+              Confirm Interview Card Generation
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
                 <div className="flex items-baseline gap-2 mb-2">
-                  <span className="text-2xl font-bold">{numCoupons} coupons × 30 minutes = </span>
-                  <span className="text-3xl font-bold text-primary">{numCoupons * 30} minutes</span>
+                  <span className="text-sm font-medium">{numCoupons} cards × 30 minutes = </span>
+                  <span className="text-lg font-bold text-primary">{numCoupons * 30} minutes</span>
                 </div>
-                <p className="text-sm text-gray-600 underline">
+                <p className="text-xs text-gray-600">
                   This action cannot be reversed
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="mt-6">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={generateCoupons}>I Agree</AlertDialogAction>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="text-xs h-8">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={generateCoupons} className="text-xs h-8">I Agree</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

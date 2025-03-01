@@ -21,7 +21,7 @@ export default function Header() {
             Docs
           </Link>
           <Link href="/pricing" className="hover:underline">
-            Job Maps
+           Pricing
           </Link>
           <Link href="/about" className="hover:underline">
             About
