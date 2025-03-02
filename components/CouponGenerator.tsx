@@ -11,7 +11,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel,
   AlertDialogAction
 } from "@/components/ui/alert-dialog";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Download, AlertTriangle } from "lucide-react";
 import { format, addMonths, isAfter, isBefore } from 'date-fns';
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -49,15 +49,14 @@ const CouponGenerator = () => {
   const [generatedCoupons, setGeneratedCoupons] = useState<Coupon[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
 
+  // New download tracking states
+  const [pdfPending, setPdfPending] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [showPdfWarning, setShowPdfWarning] = useState(false);
+
   const couponsGridRef = useRef<HTMLDivElement>(null);
 
   const [isImageUploaded, setIsImageUploaded] = useState(false);
-
-  // Add state for dialog
-  const [showDownloadDialog, setShowDownloadDialog] = useState(false);
-  const [downloadedFile, setDownloadedFile] = useState('');
-
-  const dialogShownRef = useRef(false);
 
   const [pdfState, setPdfState] = useState<{
     filename: string;
@@ -67,9 +66,12 @@ const CouponGenerator = () => {
     showDialog: false
   });
 
+  const [downloadAttempted, setDownloadAttempted] = useState(false);
+  const [regularDownloadAttempted, setRegularDownloadAttempted] = useState(false);
+
   // Load default background on mount
   useEffect(() => {
-    fetch('./templates/default-coupon-background-image.png')
+    fetch('./templates/card-1.png')
       .then(response => response.blob())
       .then(blob => {
         const reader = new FileReader();
@@ -79,9 +81,27 @@ const CouponGenerator = () => {
       .catch(error => console.error('Error loading default background:', error));
   }, []);
 
+
+
+  // Add beforeunload event listener to warn before closing window
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (pdfPending) {
+        // This message may not display in modern browsers
+        // but the dialog will still appear
+        const message = "You have generated cards that haven't been downloaded yet. Are you sure you want to leave?";
+        e.returnValue = message;
+        return message;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [pdfPending]);
+
   const validateWebsite = (url: string) => {
     if (url.length > 30) {
-      setWebsiteError('URL must not exceed 30 characters.');
+      setWebsiteError('URL must not exceed 30 characters');
       return false;
     }
     setWebsiteError('');
@@ -133,10 +153,10 @@ const CouponGenerator = () => {
             <AlertDialogDescription asChild>
               <div>
                 <div className="text-center mb-3">
-                  <p className="text-sm mb-1">Your PDF has been downloaded as:</p>
+                  <p className="text-sm mb-1">Your PDF is ready to download:</p>
                   <p className="text-base font-semibold text-primary">{filename}</p>
                 </div>
-                <p className="text-sm">Please check your downloads folder.</p>
+                <p className="text-sm">Please use the download button in the right panel.</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -151,6 +171,8 @@ const CouponGenerator = () => {
   const clearGeneratedCoupons = () => {
     setGeneratedCoupons([]);
     setProgress(0);
+    setPdfPending(false);
+    setPdfBlob(null);
     toast.success('Ready to generate new coupons');
   };
 
@@ -223,34 +245,51 @@ const CouponGenerator = () => {
 
       // Generate filename before saving
       const filename = `justpass_${coupons[0].creator}_${coupons.length}coupons_${format(new Date(), 'yyyyMMdd-HHmmss')}.pdf`;
-      
-      // Add try-catch specifically for the save operation
-      try {
-        await pdf.save(filename);
-        console.log('PDF saved successfully:', filename);
-        
-        setPdfState({
-          filename,
-          showDialog: true,
-        });
 
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-        });
-      } catch (saveError) {
-        console.error('Error saving PDF:', saveError);
-        throw new Error('Failed to save PDF file');
-      }
+      // Instead of auto-saving, store the PDF in memory
+      const pdfOutput = pdf.output('blob');
+      setPdfBlob(pdfOutput);
+      setPdfPending(true);
+
+      // Show success message but don't auto-download
+      setPdfState({
+        filename,
+        showDialog: true,
+      });
+
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
 
     } catch (error) {
       console.error('PDF Error:', error);
       toast.error('PDF generation failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
       setGeneratedCoupons([]);
+      setPdfPending(false);
+      setPdfBlob(null);
     }
   };
 
+  // Add a new function to handle manual download
+  const handleDownload = () => {
+    if (pdfBlob && pdfState.filename) {
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = pdfState.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      // Instead of marking as downloaded immediately, show confirmation first
+      setRegularDownloadAttempted(true);
+    } else {
+      toast.error('No PDF available to download');
+    }
+  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -265,7 +304,13 @@ const CouponGenerator = () => {
   };
 
   const handleGenerateClick = () => {
-    // Basic validations first
+    // If there's a pending PDF, show the warning dialog and don't proceed
+    if (pdfPending) {
+      setShowPdfWarning(true);
+      return;
+    }
+
+    // Basic validations
     if (!isImageUploaded) {
       toast.error('Please upload a background image');
       return;
@@ -300,6 +345,8 @@ const CouponGenerator = () => {
       setIsGenerating(true);
       setProgress(0);
       setGeneratedCoupons([]); // Clear before starting
+      setPdfPending(false);
+      setPdfBlob(null);
 
       const newCoupons: Coupon[] = [];
 
@@ -320,13 +367,14 @@ const CouponGenerator = () => {
       }
       console.log('Generated coupons:', newCoupons);
       await generatePDF(newCoupons);
-      // Clear state only after PDF is complete
-      setTimeout(() => setGeneratedCoupons([]), 1000);
+      // Don't clear the coupons after PDF is generated, so user can see what they're downloading
 
     } catch (error) {
       console.error('Error:', error);
       toast.error('Error generating coupons');
       setGeneratedCoupons([]); // Clear on error
+      setPdfPending(false);
+      setPdfBlob(null);
     } finally {
       setIsGenerating(false);
       setShowConfirmation(false);
@@ -419,9 +467,10 @@ const CouponGenerator = () => {
     <div className="relative flex h-full w-full bg-background">
       {/* Left Section - Input Forms */}
       <div className="w-[30%] h-full p-3 border-r">
+        
         <Card className="h-full overflow-auto shadow-sm">
           <CardHeader className="pb-2 pt-3 px-4">
-            <CardTitle className="text-base font-medium">Interview Card Settings</CardTitle>
+            <CardTitle className="text-base font-medium">Generate Interview Cards</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 p-4">
             {/* Group 1 */}
@@ -537,6 +586,57 @@ const CouponGenerator = () => {
               </div>
 
               <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs font-medium">Sample Card Templates</Label>
+                  <span className="text-xs text-muted-foreground">Click to preview</span>
+                </div>
+
+                <div className="grid grid-cols-5 gap-2 mt-1">
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <div
+                      key={num}
+                      className="relative aspect-[1.585] border rounded cursor-pointer hover:border-primary transition-colors"
+                      onClick={() => {
+                        // Load sample card
+                        fetch(`./templates/card-${num}.png`)
+                          .then(response => response.blob())
+                          .then(blob => {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              setBackgroundImage(reader.result as string);
+                              setIsImageUploaded(true);
+                              toast.success(`Sample card ${num} loaded`);
+                            };
+                            reader.readAsDataURL(blob);
+                          })
+                          .catch(error => {
+                            console.error(`Error loading sample card ${num}:`, error);
+                            toast.error(`Could not load sample card ${num}`);
+                          });
+                      }}
+                    >
+                      <img
+                        src={`./templates/card-${num}.png`}
+                        alt={`Sample card ${num}`}
+                        className="w-full h-full object-cover rounded"
+                        onError={(e) => {
+                          // Fallback for missing images
+                          e.currentTarget.src = "./templates/card-1.png";
+                        }}
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/30 text-white text-[8px] text-center py-0.5">
+                        Card {num}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-xs text-muted-foreground mt-1">
+                  Try our sample designs or upload your own custom image below
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Background Image</Label>
                 <Input
                   type="file"
@@ -554,7 +654,7 @@ const CouponGenerator = () => {
               onClick={handleGenerateClick}
               disabled={isGenerating || !creatorName || !websiteUrl || !validUntil || !isImageUploaded}
             >
-              {isGenerating ? 'Generating...' : 'Generate Interview Cards'}
+              {isGenerating ? 'Generating...' : 'Generate Now'}
             </Button>
           </CardContent>
         </Card>
@@ -579,7 +679,7 @@ const CouponGenerator = () => {
         <Card className="h-full flex flex-col shadow-sm">
           <CardHeader className="pb-2 pt-3 px-4">
             <div className="flex justify-between items-center">
-              <CardTitle className="text-base font-medium">Generated Interview Cards</CardTitle>
+              <CardTitle className="text-base font-medium">Download Interview Cards</CardTitle>
               {isGenerating && (
                 <span className="text-xs text-muted-foreground">
                   {generatedCoupons.length} of {numCoupons} generated
@@ -587,7 +687,7 @@ const CouponGenerator = () => {
               )}
             </div>
           </CardHeader>
-          
+
           <CardContent className="flex-1 p-4 overflow-auto">
             {isGenerating && (
               <div className="space-y-2 mb-4">
@@ -598,7 +698,65 @@ const CouponGenerator = () => {
               </div>
             )}
 
-            {!isGenerating && !generatedCoupons.length && (
+            {/* PDF Download Alert - Replace this section */}
+            {/* PDF Download Alert */}
+            {pdfPending && pdfBlob && (
+              <div className="mb-4 bg-amber-50 border-2 border-amber-400 rounded-md p-3">
+                <div className="flex items-start">
+                  <AlertTriangle className="text-amber-600 h-6 w-6 mr-2 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800 mb-2">
+                      Your PDF is ready to download
+                    </p>
+                    <p className="text-xs text-amber-700 mb-3">
+                      <strong>30 minutes per card</strong> have already been deducted from your account. Download your PDF now to avoid losing these minutes.
+                    </p>
+
+                    {!regularDownloadAttempted ? (
+                      <Button
+                        onClick={handleDownload}
+                        className="w-full bg-amber-600 hover:bg-amber-700 h-9 gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download PDF Now
+                      </Button>
+                    ) : (
+                      <>
+                        <div className="text-sm text-center mb-2">Did you successfully save the file?</div>
+                        <div className="flex gap-2 w-full">
+                          <Button
+                            onClick={() => {
+                              setPdfPending(false);
+                              setPdfBlob(null);
+                              setRegularDownloadAttempted(false);
+                              toast.success("PDF downloaded successfully");
+                            }}
+                            className="flex-1 bg-green-600 hover:bg-green-700 h-8"
+                          >
+                            Yes, I saved it
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setRegularDownloadAttempted(false);
+                            }}
+                            variant="outline"
+                            className="flex-1 h-8"
+                          >
+                            No, try again
+                          </Button>
+                        </div>
+                      </>
+                    )}
+
+                    <p className="text-xs text-amber-600 mt-2 text-center italic">
+                      This download button will remain available until you generate new cards
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!isGenerating && !generatedCoupons.length && !pdfPending && (
               <div className="flex items-center justify-center h-full">
                 <div className="text-sm text-muted-foreground">No Interview Cards generated yet</div>
               </div>
@@ -647,6 +805,82 @@ const CouponGenerator = () => {
           <AlertDialogFooter className="mt-4">
             <AlertDialogCancel className="text-xs h-8">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={generateCoupons} className="text-xs h-8">I Agree</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Warning Dialog for Unsaved PDF - Replace this entire section */}
+      <AlertDialog
+        open={showPdfWarning}
+        onOpenChange={(open) => {
+          // Only allow closing if no PDF is pending
+          if (!pdfPending) {
+            setShowPdfWarning(open);
+          }
+        }}
+      >
+        <AlertDialogContent className="bg-white p-6 rounded-lg max-w-md">
+          <AlertDialogHeader className="mb-4">
+            <AlertDialogTitle className="text-xl font-bold mb-4">
+              Download Required
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <div className="flex items-center gap-3 p-3 bg-red-50 rounded-md border border-red-200 text-base text-red-800 mb-5">
+                  <AlertTriangle className="h-6 w-6 text-red-600 flex-shrink-0" />
+                  <span><strong>Minutes have already been deducted</strong> from your account</span>
+                </div>
+                <p className="mb-4 text-base">
+                  You must download your PDF before generating new cards to avoid losing paid minutes.
+                </p>
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                  If you have trouble finding the saved file, it will be in your default downloads folder.
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6 flex flex-col gap-4">
+            {!downloadAttempted ? (
+              <Button
+                onClick={() => {
+                  handleDownload();
+                  setDownloadAttempted(true);
+                }}
+                className="w-full bg-primary h-12 gap-2 text-base"
+              >
+                <Download className="h-5 w-5" />
+                Download PDF Now
+              </Button>
+            ) : (
+              <>
+                <div className="text-center my-4 text-lg font-medium text-gray-700">
+                  Did you successfully save the file?
+                </div>
+                <div className="flex gap-3 w-full">
+                  <Button
+                    onClick={() => {
+                      setPdfPending(false);
+                      setPdfBlob(null);
+                      setShowPdfWarning(false);
+                      setDownloadAttempted(false);
+                      toast.success("PDF downloaded successfully");
+                    }}
+                    className="flex-1 bg-green-600 hover:bg-green-700 h-12 text-base"
+                  >
+                    Yes, I saved it
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setDownloadAttempted(false);
+                    }}
+                    variant="outline"
+                    className="flex-1 h-12 text-base"
+                  >
+                    No, try again
+                  </Button>
+                </div>
+              </>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

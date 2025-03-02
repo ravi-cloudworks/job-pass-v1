@@ -11,7 +11,7 @@ export default function CtaSection() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button size="lg" variant="secondary" asChild>
-            <Link href="/register">Get Started Now</Link>
+            <Link href="/chat">Get Started Now</Link>
           </Button>
           <Button size="lg" variant="outline" className="bg-transparent" asChild>
             <Link href="/demo">Watch Demo</Link>

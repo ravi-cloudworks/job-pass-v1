@@ -47,7 +47,7 @@ export default function Header() {
           <Button variant="outline" asChild>
             <Link href="/login">Sign In</Link>
           </Button>
-          <ThemeCustomizer />
+          {/* <ThemeCustomizer /> */}
         </nav>
       </div>
     </header>

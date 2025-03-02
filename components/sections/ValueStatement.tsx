@@ -17,7 +17,7 @@ export default function ValueStatement() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Button size="lg" asChild>
-                <Link href="/register">Start Practicing Now</Link>
+                <Link href="/chat">Start Practicing Now</Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <Link href="#how-it-works">See How It Works</Link>

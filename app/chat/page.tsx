@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Chat from "@/components/Chat"
-import ImageGallery from "@/components/ImageGallery"
+import InterviewVault from "@/components/InterviewVault"
 import { useToast } from "@/hooks/use-toast"  // Update this import
 import { chatbotFlow } from "@/utils/chatbotFlow"
 
@@ -118,7 +118,7 @@ export default function ChatPage() {
           />
         </div>
         <div className="col-span-6 border rounded-lg overflow-hidden">
-          <ImageGallery
+          <InterviewVault
             images={images}
             filter={filter}
             onFilterChange={setFilter}
