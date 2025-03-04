@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -34,25 +34,95 @@ interface ViewMockInterviewModalProps {
   videoUrl: string;
   category?: string;
   complexity?: string;
+  onUploadSuccess?: (localUrl: string, youtubeUrl: string, youtubeId: string) => void;
 }
 
 export default function ViewMockInterviewModal({
   onClose,
-  videoUrl,
+  videoUrl: initialVideoUrl,
   category = '',
   complexity = 'Easy',
+  onUploadSuccess
 }: ViewMockInterviewModalProps) {
   const { toast } = useToast();
+  const [videoUrl, setVideoUrl] = useState<string>(initialVideoUrl);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showInstructions, setShowInstructions] = useState(false);
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isYouTubeVideoValid, setIsYouTubeVideoValid] = useState<boolean>(true);
   
   // Unified progress stage
   const [progressStage, setProgressStage] = useState<0 | 1 | 2 | 3>(0); // 0=idle, 1=instructions, 2=auth, 3=upload
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Parse combined URL format (if present)
+  useEffect(() => {
+    // Always handle URLs on initializing the component
+    console.log('Initial URL processing:', initialVideoUrl);
+    
+    if (initialVideoUrl?.includes('|')) {
+      const [blobUrl, youtubeUrl] = initialVideoUrl.split('|');
+      // For reopened videos, prefer YouTube URL if available
+      if (youtubeUrl && youtubeUrl.includes('youtu')) {
+        setVideoUrl(initialVideoUrl);
+        
+        // Extract video ID from YouTube URL
+        const videoIdMatch = youtubeUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^?&/]+)/);
+        const extractedVideoId = videoIdMatch ? videoIdMatch[1] : null;
+        if (extractedVideoId) {
+          setVideoId(extractedVideoId);
+        }
+      } else {
+        // Fall back to blob if no YouTube URL
+        setVideoUrl(blobUrl);
+      }
+    } else {
+      setVideoUrl(initialVideoUrl);
+    }
+  }, [initialVideoUrl]);
+  
+  // Debug current state
+  useEffect(() => {
+    console.log('1. ViewModal - Current state:', {
+      videoUrl,
+      initialVideoUrl,
+      parsedUrl: {
+        blobUrl: videoUrl?.includes('|') ? videoUrl.split('|')[0] : videoUrl,
+        youtubeUrl: videoUrl?.includes('|') ? videoUrl.split('|')[1] : null
+      },
+      videoId,
+      isYouTubeVideo: videoUrl?.includes('youtu') || videoUrl?.includes('|'),
+      urlContainsYouTube: videoUrl?.includes('youtu'),
+      hasVideoId: !!videoId
+    });
+  }, [videoUrl, initialVideoUrl, videoId]);
+  
+  // Check if YouTube video is valid and extract existing videoId
+  useEffect(() => {
+    if (videoUrl?.includes('youtu.be/') || videoUrl?.includes('youtube.com/')) {
+      // Extract video ID
+      const videoIdMatch = videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^?&/]+)/);
+      const extractedVideoId = videoIdMatch ? videoIdMatch[1] : null;
+      
+      if (extractedVideoId) {
+        // Set the video ID from URL
+        setVideoId(extractedVideoId);
+        
+        // Check if video exists via oEmbed
+        fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${extractedVideoId}&format=json`)
+          .then(response => {
+            setIsYouTubeVideoValid(response.ok);
+          })
+          .catch(() => {
+            setIsYouTubeVideoValid(false);
+          });
+      }
+    }
+  }, [videoUrl]);
   
   // Helper function to get complexity stars
   const getComplexityStars = (complexity: string) => {
@@ -83,16 +153,21 @@ export default function ViewMockInterviewModal({
     onSuccess: async (tokenResponse) => {
       console.log('Login Success:', tokenResponse);
       setAccessToken(tokenResponse.access_token);
-      
-      // Progress to upload stage
       setProgressStage(3);
+      
+      // Progress notification
+      toast({
+        title: "Step 1 Complete",
+        description: "Successfully logged in, now uploading video...",
+        duration: 3000,
+      });
       
       // Automatically upload after login
       setTimeout(() => {
         if (tokenResponse.access_token) {
           uploadToYouTube(tokenResponse.access_token);
         }
-      }, 500);
+      }, 1000);
     },
     onError: (error) => {
       console.error('Login Failed:', error);
@@ -106,6 +181,8 @@ export default function ViewMockInterviewModal({
         duration: 5000,
       });
     },
+    flow: "implicit", // Added for better auth flow
+    prompt: "consent", // Force consent screen to allow selecting different accounts
     scope: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.force-ssl'
   });
 
@@ -121,6 +198,8 @@ export default function ViewMockInterviewModal({
     }
 
     try {
+      setIsUploading(true);
+      setProgressStage(3);
       setUploadProgress(10);
 
       // Simulate progress updates
@@ -134,8 +213,9 @@ export default function ViewMockInterviewModal({
         });
       }, 1000);
 
-      // Get the video file
-      const response = await fetch(videoUrl);
+      // Get the video file - use blob part if combined URL
+      const sourceUrl = videoUrl.includes('|') ? videoUrl.split('|')[0] : videoUrl;
+      const response = await fetch(sourceUrl);
       const blob = await response.blob();
       const file = new File([blob], 'interview.webm', { type: 'video/webm' });
 
@@ -216,7 +296,35 @@ export default function ViewMockInterviewModal({
 
       if (result.id) {
         setVideoId(result.id);
+        
+        // Create YouTube URL
+        const youtubeUrl = `https://youtu.be/${result.id}`;
+        
+        console.log('2. ViewModal - Upload success:', {
+          originalVideoUrl: videoUrl,
+          newYoutubeUrl: youtubeUrl,
+          youtubeId: result.id
+        });
+        
+        // Create combined URL format - keep the blob URL for now
+        const combinedUrl = `${videoUrl}|${youtubeUrl}`;
+        
+        // Set the combined URL
+        setVideoUrl(combinedUrl);
+        
+        // Notify parent component to update storage and delete local file
+        if (onUploadSuccess) {
+          console.log('3. ViewModal - Calling onUploadSuccess with:', {
+            localUrl: videoUrl,
+            youtubeUrl,
+            youtubeId: result.id
+          });
+          onUploadSuccess(videoUrl, youtubeUrl, result.id);
+        }
+        
+        // Show success modal with confetti
         setSuccessModalOpen(true);
+        
         toast({
           title: "Upload Successful",
           description: "Your video has been uploaded to YouTube",
@@ -238,6 +346,7 @@ export default function ViewMockInterviewModal({
       setIsProcessing(false);
       setProgressStage(0);
       setUploadProgress(0);
+      setIsUploading(false);
     }
   };
 
@@ -266,6 +375,71 @@ export default function ViewMockInterviewModal({
     return baseProgress + remainingProgressPercent;
   };
 
+  // Parse video URL info
+  const parsedUrl = {
+    blobUrl: videoUrl?.includes('|') ? videoUrl.split('|')[0] : videoUrl,
+    youtubeUrl: videoUrl?.includes('|') ? videoUrl.split('|')[1] : null
+  };
+
+  // Determine if the video is a YouTube video based on either videoUrl or videoId
+  const isYouTubeVideo = (videoUrl?.includes('youtu') || parsedUrl.youtubeUrl != null || !!videoId);
+  
+  
+  // For debug
+  useEffect(() => {
+    console.log('11. ViewModal - Rendering section:', {
+      parsedUrl,
+      videoId,
+      isYouTubeVideo,
+      isProcessing,
+      hasError: !!errorMessage
+    });
+  }, [parsedUrl, videoId, isYouTubeVideo, isProcessing, errorMessage]);
+
+  // Determine which player to show
+  const renderVideoPlayer = () => {
+    if (!isYouTubeVideoValid && videoUrl?.includes('youtu')) {
+      return (
+        <div className="bg-gray-100 w-full h-full flex flex-col items-center justify-center p-8 text-center">
+          <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
+          <h3 className="text-lg font-medium mb-2">YouTube Video Unavailable</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            This video is no longer available on YouTube. It may have been deleted or made private.
+          </p>
+        </div>
+      );
+    }
+    
+    // If we have a blob URL, use standard video player
+    if (!parsedUrl.youtubeUrl) {
+      return (
+        <video src={parsedUrl.blobUrl} controls className="w-full h-full" />
+      );
+    }
+    
+    // If we have a YouTube URL, embed it
+    if (parsedUrl.youtubeUrl) {
+      const youtubeId = parsedUrl.youtubeUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^?&/]+)/)?.[1];
+      
+      if (youtubeId) {
+        return (
+          <iframe 
+            src={`https://www.youtube.com/embed/${youtubeId}`}
+            className="w-full h-full"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        );
+      }
+    }
+    
+    // Fallback to original blob URL
+    return (
+      <video src={parsedUrl.blobUrl} controls className="w-full h-full" />
+    );
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -275,20 +449,7 @@ export default function ViewMockInterviewModal({
     >
       <div className="bg-background rounded-lg shadow-md w-[90vw] h-[90vh] flex flex-col border border-border overflow-hidden">
         <div className="py-3 px-4 border-b flex justify-between items-center">
-          {/* <div className="flex flex-col">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                {getComplexityStars(complexity)} {complexity}
-              </span>
-              {category && (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-50 text-gray-700 border border-gray-200">
-                  {category}
-                </span>
-              )}
-            </div>
-            <h1 className="text-lg font-semibold">Interview Recording</h1>
-          </div> */}
-          
+  
           <Button 
             variant="ghost" 
             size="icon" 
@@ -321,11 +482,7 @@ export default function ViewMockInterviewModal({
           {/* Video Panel - Made fullwidth */}
           <div className="border rounded-lg overflow-hidden flex flex-col">
             <div className="flex-grow relative">
-              <video
-                src={videoUrl}
-                controls
-                className="w-full h-full"
-              />
+              {renderVideoPlayer()}
               {isProcessing && progressStage === 2 && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40">
                   <div className="bg-white p-4 rounded-lg shadow-lg text-center space-y-3 max-w-sm">
@@ -361,27 +518,27 @@ export default function ViewMockInterviewModal({
         {/* Bottom Controls Panel */}
         <div className="px-4 pb-4 pt-1 border-t">
           <div className="flex items-center gap-4">
-            {videoId ? (
-              <>
+            {parsedUrl.youtubeUrl ? (
+              <div className="flex w-full items-center gap-4">
                 <Alert className="flex-1 bg-green-50 border-green-200 text-green-800">
                   <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertTitle className="text-sm font-medium text-green-800">Video uploaded successfully!</AlertTitle>
+                  <AlertTitle className="text-sm font-medium text-green-800">Video available on YouTube</AlertTitle>
                   <AlertDescription className="text-xs mt-1 text-green-700">
-                    Your recording is now available on YouTube
+                    Your recording is published as an unlisted video
                   </AlertDescription>
                 </Alert>
                 
                 <Button
-                  onClick={() => window.open(`https://youtu.be/${videoId}`, '_blank')}
+                  onClick={() => window.open(parsedUrl.youtubeUrl || '', '_blank')}
                   size="sm"
                   className="text-xs"
                 >
                   <Youtube className="mr-1.5 h-4 w-4" />
                   Open on YouTube
                 </Button>
-              </>
+              </div>
             ) : errorMessage ? (
-              <>
+              <div className="flex w-full items-center gap-4">
                 <Alert className="flex-1 bg-red-50 border-red-200 text-red-800">
                   <AlertTriangle className="h-4 w-4 text-red-600" />
                   <AlertTitle className="text-sm font-medium text-red-800">Error</AlertTitle>
@@ -419,7 +576,7 @@ export default function ViewMockInterviewModal({
                   <ArrowRight className="mr-1.5 h-4 w-4" />
                   Try Again
                 </Button>
-              </>
+              </div>
             ) : isProcessing ? (
               <div className="flex-1">
                 <Alert className="bg-primary/5 border-primary/20">
@@ -431,7 +588,7 @@ export default function ViewMockInterviewModal({
                 </Alert>
               </div>
             ) : (
-              <>
+              <div className="flex w-full items-center gap-4">
                 <Alert className="flex-1 bg-primary/5 border-primary/20">
                   <Info className="h-4 w-4 text-primary" />
                   <AlertTitle className="text-sm font-medium">Save your recording</AlertTitle>
@@ -450,7 +607,7 @@ export default function ViewMockInterviewModal({
                   <Youtube className="mr-1.5 h-4 w-4" />
                   Save to YouTube
                 </Button>
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -500,6 +657,7 @@ export default function ViewMockInterviewModal({
                   <a 
                     href="https://www.youtube.com/create_channel" 
                     target="_blank" 
+                    rel="noopener noreferrer"
                     className="text-blue-500 underline flex items-center"
                   >
                     Click here to create a YouTube channel
@@ -538,20 +696,20 @@ export default function ViewMockInterviewModal({
             <div className="w-full p-4 bg-muted rounded-md">
               <p className="font-medium mb-2">Video Link:</p>
               <a 
-                href={`https://youtu.be/${videoId}`} 
+                href={parsedUrl.youtubeUrl || `https://youtu.be/${videoId || ''}`} 
                 target="_blank"
                 rel="noopener noreferrer" 
                 className="text-blue-500 hover:text-blue-700 hover:underline flex items-center justify-center gap-2 p-3 bg-card rounded border border-border transition-colors"
               >
                 <Youtube className="h-5 w-5" />
-                https://youtu.be/{videoId}
+                {parsedUrl.youtubeUrl || `https://youtu.be/${videoId || ''}`}
               </a>
             </div>
             
             <div className="flex gap-4">
               <Button 
                 onClick={() => {
-                  navigator.clipboard.writeText(`https://youtu.be/${videoId}`);
+                  navigator.clipboard.writeText(parsedUrl.youtubeUrl || `https://youtu.be/${videoId || ''}`);
                   toast({
                     title: "Link copied",
                     description: "YouTube URL copied to clipboard",
@@ -566,7 +724,7 @@ export default function ViewMockInterviewModal({
                 Copy Link
               </Button>
               <Button 
-                onClick={() => window.open(`https://youtu.be/${videoId}`, '_blank')}
+                onClick={() => window.open(parsedUrl.youtubeUrl || `https://youtu.be/${videoId || ''}`, '_blank')}
                 size="sm"
                 className="text-xs"
               >

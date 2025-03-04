@@ -42,6 +42,11 @@ export default function Header() {
                   Generate Interview Cards
                 </Link>
               </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/test" className="w-full">
+                  Create Custom Mock Test
+                </Link>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="outline" asChild>

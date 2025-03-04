@@ -1,10 +1,10 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { format } from "date-fns"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Star, Clock, FileCheck, ArrowRight } from "lucide-react"
+import { Star, Clock, FileCheck, ArrowRight, Youtube } from "lucide-react"
 import { motion } from "framer-motion"
 import MockInterviewModal from "./MockInterviewModal"
 import ViewMockInterviewModal from "./ViewMockInterviewModal"
@@ -23,12 +23,14 @@ interface ImageData {
   category: string
 }
 
+
 interface InterviewVaultProps {
   images: ImageData[]
   filter: string
   onFilterChange: (filter: string) => void
   onToggleFavorite: (index: number) => void
   onCompleteInterview: (index: number, videoUrl: string) => void
+  onUpdateImage?: (index: number, updatedData: Partial<ImageData>) => void
 }
 
 export default function InterviewVault({
@@ -37,14 +39,21 @@ export default function InterviewVault({
   onFilterChange,
   onToggleFavorite,
   onCompleteInterview,
+  onUpdateImage
 }: InterviewVaultProps) {
   const [activeTab, setActiveTab] = useState<"new" | "completed" | "favorites">("new")
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
   const [showCompletedInterview, setShowCompletedInterview] = useState(false)
   const [showMockInterview, setShowMockInterview] = useState(false)
+  const [localImages, setLocalImages] = useState<ImageData[]>(images)
+  
+  // Update local state when prop changes
+  useEffect(() => {
+    setLocalImages(images);
+  }, [images])
 
   // Sort images based on the active tab
-  const sortedImages = [...images].sort((a, b) => {
+  const sortedImages = [...localImages].sort((a, b) => {
     if (activeTab === "completed" && a.completedAt && b.completedAt) {
       return b.completedAt.getTime() - a.completedAt.getTime()
     }
@@ -66,9 +75,37 @@ export default function InterviewVault({
         img.url.includes(filter),
       )
 
+  // Determines if a video URL is a YouTube URL (either directly or part of a combined URL)
+  const isYouTubeVideo = (videoUrl?: string) => {
+    if (!videoUrl) return false;
+    
+    // If it's a combined URL format (blob|youtube)
+    if (videoUrl.includes('|')) {
+      const parts = videoUrl.split('|');
+      return parts.length > 1 && parts[1].includes('youtu');
+    }
+    
+    // Direct YouTube URL
+    return videoUrl.includes('youtu');
+  };
+  
+  // Helper to get clean URL for display/reopening
+  const getCleanVideoUrl = (videoUrl?: string) => {
+    if (!videoUrl) return "";
+    
+    // If this is a reopened interview with combined URL, use only YouTube part
+    if (videoUrl.includes('|')) {
+      const [blobUrl, youtubeUrl] = videoUrl.split('|');
+      // When reopening from vault, prefer YouTube URL if available
+      return youtubeUrl || blobUrl;
+    }
+    
+    return videoUrl;
+  };
+
   const handleImageClick = (index: number) => {
     const image = filteredImages[index]
-    const originalIndex = images.findIndex(img => img === image)
+    const originalIndex = localImages.findIndex(img => img === image)
 
     if (image.isCompleted) {
       setSelectedImageIndex(originalIndex)
@@ -93,6 +130,43 @@ export default function InterviewVault({
       handleCloseModal()
     }
   }
+  
+  const handleYoutubeUploadSuccess = (localUrl: string, youtubeUrl: string, youtubeId: string) => {
+    console.log('5. InterviewVault - handleYoutubeUploadSuccess called with:', {
+      localUrl,
+      youtubeUrl,
+      youtubeId,
+      selectedImageIndex
+    });
+    
+    if (selectedImageIndex !== null && onUpdateImage) {
+      console.log('6. InterviewVault - Before update, current state:', {
+        currentVideoUrl: localImages[selectedImageIndex].videoUrl,
+        isYouTube: localImages[selectedImageIndex].videoUrl?.includes('youtu')
+      });
+      
+      // Create combined URL with both blob and YouTube URLs
+      const combinedUrl = `${localUrl}|${youtubeUrl}`;
+      
+      // Update local state immediately
+      const updatedImages = [...localImages];
+      updatedImages[selectedImageIndex] = {
+        ...updatedImages[selectedImageIndex],
+        videoUrl: combinedUrl
+      };
+      
+      console.log('7. InterviewVault - Setting local images with new videoUrl:', combinedUrl);
+      setLocalImages(updatedImages);
+      
+      // Update the image with YouTube information via parent component
+      console.log('8. InterviewVault - Calling onUpdateImage to update parent state');
+      onUpdateImage(selectedImageIndex, {
+        videoUrl: combinedUrl
+      });
+      
+      console.log('9. InterviewVault - YouTube upload success handling complete');
+    }
+  }
 
   // Get complexity star rating
   const getComplexityStars = (complexity: ComplexityLevel) => {
@@ -108,6 +182,7 @@ export default function InterviewVault({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
       {imagesToRender.map((image, index) => {
         const complexity = image.complexity || 'Easy';
+        const hasYouTube = isYouTubeVideo(image.videoUrl);
 
         return (
           <motion.div
@@ -140,7 +215,7 @@ export default function InterviewVault({
                       className="h-8 w-8 p-0 rounded-full"
                       onClick={(e) => {
                         e.stopPropagation()
-                        const originalIndex = images.findIndex(img => img === image)
+                        const originalIndex = localImages.findIndex(img => img === image)
                         onToggleFavorite(originalIndex)
                       }}
                     >
@@ -154,9 +229,18 @@ export default function InterviewVault({
                 {/* Status */}
                 <div className="mb-3">
                   {image.isCompleted ? (
-                    <div className="flex items-center text-green-600 font-medium text-xs">
-                      <FileCheck className="w-3.5 h-3.5 mr-1" />
-                      <span>Completed</span>
+                    <div className="flex items-center font-medium text-xs">
+                      {hasYouTube ? (
+                        <div className="flex items-center text-red-600">
+                          <Youtube className="w-3.5 h-3.5 mr-1" />
+                          <span>Private Video</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center text-green-600">
+                          <FileCheck className="w-3.5 h-3.5 mr-1" />
+                          <span>Completed</span>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-center text-primary font-medium text-xs">
@@ -184,10 +268,17 @@ export default function InterviewVault({
               {/* Call-to-action footer */}
               <div className={`px-4 py-2 text-xs font-medium ${
                 image.isCompleted 
-                  ? "bg-green-50 text-green-700" 
+                  ? hasYouTube
+                    ? "bg-red-50 text-red-700"
+                    : "bg-green-50 text-green-700" 
                   : "bg-blue-50 text-primary"
               }`}>
-                {image.isCompleted ? "View Recording" : "Start Interview"}
+                {image.isCompleted 
+                  ? hasYouTube 
+                    ? "View Recording" 
+                    : "View Recording" 
+                  : "Start Interview"
+                }
               </div>
             </div>
           </motion.div>
@@ -249,18 +340,19 @@ export default function InterviewVault({
         <MockInterviewModal
           onClose={handleCloseModal}
           onComplete={handleCompleteInterview}
-          questionSetId={images[selectedImageIndex].questionSetId}
-          category={images[selectedImageIndex].category}
-          complexity={images[selectedImageIndex].complexity}
+          questionSetId={localImages[selectedImageIndex].questionSetId}
+          category={localImages[selectedImageIndex].category}
+          complexity={localImages[selectedImageIndex].complexity}
         />
       )}
 
       {showCompletedInterview && selectedImageIndex !== null && (
         <ViewMockInterviewModal
           onClose={handleCloseModal}
-          videoUrl={images[selectedImageIndex].videoUrl || ""}
-          category={images[selectedImageIndex].category}
-          complexity={images[selectedImageIndex].complexity}
+          videoUrl={localImages[selectedImageIndex].videoUrl || ""}
+          category={localImages[selectedImageIndex].category}
+          complexity={localImages[selectedImageIndex].complexity}
+          onUploadSuccess={handleYoutubeUploadSuccess}
         />
       )}
     </div>

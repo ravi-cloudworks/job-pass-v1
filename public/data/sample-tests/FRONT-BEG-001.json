@@ -1,0 +1,27 @@
+{
+    "id": "FRONT-BEG-001",
+    "title": "# Frontend Development Fundamentals\n## HTML, CSS, and JavaScript Basics",
+    "time_limit": 180,
+    "questions": [
+      {
+        "id": "q1",
+        "question": "# HTML Accessibility\n\nLook at this HTML code snippet:\n\n```html\n<!DOCTYPE html>\n<html>\n<head>\n  <title>My First Page</title>\n</head>\n<body>\n  <h1>Welcome!</h1>\n  <p>This is my website.</p>\n  <div>\n    <img src=\"photo.jpg\">\n  </div>\n  <div onclick=\"location.href='about.html'\" style=\"background-color: blue; color: white; padding: 10px;\">\n    Learn More\n  </div>\n</body>\n</html>\n```\n\nIdentify three accessibility issues in this code and explain how to fix them. Consider image attributes, semantic HTML, keyboard navigation, and color contrast."
+      },
+      {
+        "id": "q2",
+        "question": "# CSS Layout\n\nExamine this image showing CSS layout concepts:\n\n![CSS Box Model](https://www.washington.edu/accesscomputing/webd2/student/unit3/images/boxmodel.gif)\n\nGiven the following CSS:\n\n```css\n.box {\n  width: 300px;\n  padding: 20px;\n  border: 5px solid black;\n  margin: 10px;\n  box-sizing: content-box;\n}\n```\n\nCalculate the total width of this element as rendered in the browser, explaining each component. Then explain how this would change if you used `box-sizing: border-box` instead."
+      },
+      {
+        "id": "q3",
+        "question": "# JavaScript Scope\n\n```javascript\nlet count = 10;\nconst message = 'Hello';\nvar flag = true;\n\nfunction updateCount() {\n  let count = 20;\n  console.log(count); // Line A\n  \n  if (flag) {\n    var localFlag = false;\n    let localMessage = 'Hi';\n    console.log(message); // Line B\n  }\n  \n  console.log(localFlag); // Line C\n  console.log(localMessage); // Line D\n}\n\nupdateCount();\nconsole.log(count); // Line E\n```\n\nWhat values will be logged at lines A, B, C, D, and E? Explain the scope differences between `let`, `const`, and `var`, and identify any errors in this code."
+      },
+      {
+        "id": "q4",
+        "question": "# Responsive Web Design\n\nResponsive design is critical for modern websites. Look at this image showing different devices:\n\n![Responsive Design](https://miro.medium.com/max/1400/1*2TUKm12i_YGiIlMbulX7Ow.jpeg)\n\n1. Explain the concept of \"mobile-first\" design and why it's important\n2. Write a CSS media query that applies styles only for screens between 768px and 1024px wide\n3. Describe three responsive design techniques beyond media queries\n4. How would you handle high-resolution images for different device resolutions?"
+      },
+      {
+        "id": "q5",
+        "question": "# DOM Manipulation\n\nExamine this JavaScript code:\n\n```javascript\ndocument.getElementById('submit-button').addEventListener('click', function() {\n  const name = document.getElementById('name-input').value;\n  const email = document.getElementById('email-input').value;\n  \n  if (name && email) {\n    const listItem = document.createElement('li');\n    listItem.textContent = `${name}: ${email}`;\n    document.getElementById('user-list').appendChild(listItem);\n    \n    document.getElementById('name-input').value = '';\n    document.getElementById('email-input').value = '';\n  }\n});\n```\n\n1. What does this code do?\n2. Identify two potential issues with this implementation\n3. Rewrite this using modern JavaScript practices\n4. How would you improve the user experience with this form?"
+      }
+    ]
+  }

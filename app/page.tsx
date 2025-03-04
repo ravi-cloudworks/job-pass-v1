@@ -11,13 +11,13 @@ import PricingSection from "@/components/sections/PricingSection"
 import FaqSection from "@/components/sections/FaqSection"
 import CtaSection from "@/components/sections/CtaSection"
 import FooterSection from "@/components/sections/FooterSection"
+import VideoReviewTool from "@/components/VideoReviewTool"
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       {/* Section 1: Value Statement */}
       <ValueStatement />
-      
       {/* Section 2: Proof That It Works */}
       <ProofSection />
       

@@ -413,7 +413,7 @@ const CouponGenerator = () => {
         fill={textColor}
         textAnchor="middle"
       >
-        {websiteUrl}/jobpass
+        {websiteUrl}
       </text>
 
       <text

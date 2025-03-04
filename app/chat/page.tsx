@@ -3,12 +3,12 @@
 import { useState } from "react"
 import Chat from "@/components/Chat"
 import InterviewVault from "@/components/InterviewVault"
-import { useToast } from "@/hooks/use-toast"  // Update this import
-import { chatbotFlow } from "@/utils/chatbotFlow"
+import { useToast } from "@/hooks/use-toast"
 
 interface ImageData {
   url: string
   createdAt: Date
+  completedAt?: Date
   isFavorite: boolean
   isCompleted: boolean
   videoUrl?: string
@@ -95,8 +95,29 @@ export default function ChatPage() {
       newImages[index] = {
         ...newImages[index],
         isCompleted: true,
+        completedAt: new Date(),
         videoUrl: videoUrl // Store the full blob URL
       };
+      return newImages;
+    });
+  };
+
+  // NEW FUNCTION: Update image data (for YouTube upload success)
+  const updateImage = (index: number, updatedData: Partial<ImageData>) => {
+    console.log("updateImage called with index:", index, "data:", updatedData);
+    
+    if (index < 0 || index >= images.length) {
+      console.error("Invalid image index:", index);
+      return;
+    }
+    
+    setImages(prev => {
+      const newImages = [...prev];
+      newImages[index] = {
+        ...newImages[index],
+        ...updatedData
+      };
+      console.log("Updated image in parent state:", newImages[index]);
       return newImages;
     });
   };
@@ -124,10 +145,10 @@ export default function ChatPage() {
             onFilterChange={setFilter}
             onToggleFavorite={toggleFavorite}
             onCompleteInterview={completeInterview}
+            onUpdateImage={updateImage}
           />
         </div>
       </div>
     </div>
   )
 }
-

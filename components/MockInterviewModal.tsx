@@ -30,6 +30,9 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import html2canvas from 'html2canvas'
 
+// import remarkGfm from 'remark-gfm';
+import { marked } from 'marked';
+
 // Video configuration constants
 const VIDEO_CONFIG = {
   WIDTH: 1280,
@@ -103,7 +106,7 @@ export default function MockInterviewModal({
   const initializeCamera = async () => {
     setError(null)
     try {
-      console.log("Initializing camera preview...")
+      //console.log("Initializing camera preview...")
 
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop())
@@ -132,7 +135,7 @@ export default function MockInterviewModal({
 
         setIsStreaming(true)
         setError(null)
-        console.log("Camera initialized successfully")
+        //console.log("Camera initialized successfully")
       }
     } catch (err) {
       console.error("Camera preview error:", err)
@@ -172,7 +175,7 @@ export default function MockInterviewModal({
     const fetchQuestions = async () => {
       try {
         setIsLoading(true)
-        console.log("Fetching questions for ID:", questionSetId)
+        //console.log("Fetching questions for ID:", questionSetId)
 
         const urls = [
           `data/mock-interviews/${questionSetId}.json`,
@@ -183,14 +186,14 @@ export default function MockInterviewModal({
 
         for (const url of urls) {
           try {
-            console.log("Attempting to fetch from:", url)
+            //console.log("Attempting to fetch from:", url)
             response = await fetch(url)
             if (response.ok) {
               successUrl = url
               break
             }
           } catch (err) {
-            console.log("Failed to fetch from:", url, err)
+            //console.log("Failed to fetch from:", url, err)
           }
         }
 
@@ -198,9 +201,9 @@ export default function MockInterviewModal({
           throw new Error(`Failed to fetch from any URL. Last status: ${response?.status}`)
         }
 
-        console.log("Successfully fetched from:", successUrl)
+        //console.log("Successfully fetched from:", successUrl)
         const data: QuestionSet = await response.json()
-        console.log("Fetched data:", data)
+        //console.log("Fetched data:", data)
 
         setQuestions(data.questions)
         setTitle(data.title)
@@ -244,7 +247,7 @@ export default function MockInterviewModal({
         return null
       }
 
-      console.log("Capturing content for question:", currentQuestionIndex)
+      //console.log("Capturing content for question:", currentQuestionIndex)
 
       // Set specific dimensions for the capture
       const snapshot = await html2canvas(contentSection, {
@@ -376,10 +379,10 @@ export default function MockInterviewModal({
   // Handle question navigation
   const handleQuestionChange = async () => {
     if (isInterviewStarted) {
-      console.log("Taking snapshot for question:", currentQuestionIndex)
+      //console.log("Taking snapshot for question:", currentQuestionIndex)
       const snapshot = await takeSnapshot()
       if (snapshot) {
-        console.log("Snapshot taken at:", snapshot.timestamp, "ms from start")
+        //console.log("Snapshot taken at:", snapshot.timestamp, "ms from start")
         setQuestionSnapshots(prev => [...prev, snapshot])
       }
     }
@@ -387,14 +390,14 @@ export default function MockInterviewModal({
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
-      console.log("Moving to next question")
+      //console.log("Moving to next question")
       setCurrentQuestionIndex(prev => prev + 1)
     }
   }
 
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      console.log("Moving to previous question")
+      //console.log("Moving to previous question")
       setCurrentQuestionIndex(prev => prev - 1)
     }
   }
@@ -438,6 +441,8 @@ export default function MockInterviewModal({
       resumeRecording()
     }
   }
+
+
 
   const handleCompleteInterview = async () => {
     if (!mediaRecorderRef.current || !isInterviewStarted) return
@@ -608,8 +613,8 @@ export default function MockInterviewModal({
         {/* Timer Bar when interview started */}
         {isInterviewStarted && (
           <div className={`px-4 py-2 flex items-center justify-between ${isRecordingPaused
-              ? "bg-amber-50 border-b border-amber-200"
-              : "bg-primary/5 border-b border-primary/20"
+            ? "bg-amber-50 border-b border-amber-200"
+            : "bg-primary/5 border-b border-primary/20"
             }`}>
             <div className="flex items-center">
               <Clock className={`h-4 w-4 mr-2 ${isRecordingPaused ? "text-amber-600" : "text-primary"}`} />
@@ -709,9 +714,21 @@ export default function MockInterviewModal({
                     </span>
                   </div>
                   <div className="question-content flex-grow overflow-y-auto mb-4">
-                    <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none">
-                      {questions[currentQuestionIndex]?.question || "No question available"}
-                    </ReactMarkdown>
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: `
+                            <style>
+                              .md-content h1 { font-size: 1.8em; font-weight: bold; margin-bottom: 0.5em; }
+                              .md-content h2 { font-size: 1.5em; font-weight: bold; margin-bottom: 0.5em; }
+                              .md-content pre { background-color: #f4f4f4; padding: 1rem; border-radius: 4px; }
+                              .md-content ul { list-style-type: disc; margin-left: 1.5em; }
+                              .md-content ol { list-style-type: decimal; margin-left: 1.5em; }
+                            </style>
+                            <div class="md-content">${marked(questions[currentQuestionIndex]?.question || "")}</div>
+                          `
+                      }}
+                      className="question-content flex-grow overflow-y-auto mb-4"
+                    />
                   </div>
                   <div className="flex justify-between mt-auto pt-2 border-t">
                     <Button
