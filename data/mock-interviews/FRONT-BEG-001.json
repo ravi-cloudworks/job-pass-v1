@@ -1,0 +1,47 @@
+{
+    "id": "FRONT-BEG-001",
+    "title": "# Frontend Development Fundamentals\n## HTML, CSS, and JavaScript Basics",
+    "time_limit": 180,
+    "questions": [
+      {
+        "id": "q1",
+        "question": "# HTML Structure\n\nLook at this HTML code snippet:\n\n```html\n<!DOCTYPE html>\n<html>\n<head>\n  <title>My First Page</title>\n</head>\n<body>\n  <h1>Welcome!</h1>\n  <p>This is my website.</p>\n  <div>\n    <img src=\"photo.jpg\">\n  </div>\n</body>\n</html>\n```\n\nIdentify two accessibility issues in this code and explain how to fix them."
+      },
+      {
+        "id": "q2",
+        "question": "# CSS Selectors\n\nGiven the following HTML:\n\n```html\n<div class=\"container\">\n  <ul id=\"main-list\">\n    <li class=\"item special\">First item</li>\n    <li class=\"item\">Second item</li>\n    <li class=\"item\">Third item</li>\n  </ul>\n</div>\n```\n\nWrite three different CSS selectors that would target only the 'First item' element. Explain the difference between them and which one would be most appropriate in a real project."
+      },
+      {
+        "id": "q3",
+        "question": "# CSS Box Model\n\nExplain the difference between these two CSS declarations:\n\n```css\n.box1 {\n  width: 300px;\n  padding: 20px;\n  border: 5px solid black;\n  box-sizing: content-box;\n}\n\n.box2 {\n  width: 300px;\n  padding: 20px;\n  border: 5px solid black;\n  box-sizing: border-box;\n}\n```\n\nWhat will be the total width of each box as rendered in the browser? Show your calculations."
+      },
+      {
+        "id": "q4",
+        "question": "# JavaScript Variables\n\n```javascript\nlet count = 10;\nconst message = 'Hello';\nvar flag = true;\n\nfunction updateCount() {\n  let count = 20;\n  console.log(count);\n}\n\nupdateCount();\nconsole.log(count);\n```\n\nWhat values will be logged to the console and why? Explain the scope differences between `let`, `const`, and `var`."
+      },
+      {
+        "id": "q5",
+        "question": "# Responsive Design\n\nYou're building a website that needs to work well on mobile devices and desktop computers.\n\n1. What is the purpose of the following meta tag and why is it important?\n\n```html\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n```\n\n2. Write a CSS media query that applies styles only when the screen width is less than 768px."
+      },
+      {
+        "id": "q6",
+        "question": "# DOM Manipulation\n\nExamine this JavaScript code:\n\n```javascript\ndocument.getElementById('button').addEventListener('click', function() {\n  const newElement = document.createElement('p');\n  newElement.textContent = 'You clicked the button!';\n  document.body.appendChild(newElement);\n});\n```\n\nExplain what this code does and identify a potential issue that might arise if the page loads slowly. How would you fix it?"
+      },
+      {
+        "id": "q7",
+        "question": "# Flexbox Layout\n\nYou need to create a navigation bar with the following requirements:\n- Logo on the left\n- Navigation links centered\n- Login button on the right\n- All elements should stay aligned on different screen sizes\n\nWrite the HTML structure and CSS using Flexbox to achieve this layout. Explain your approach."
+      },
+      {
+        "id": "q8",
+        "question": "# JavaScript Functions\n\nCompare these three different ways of defining functions:\n\n```javascript\n// Function 1\nfunction calculateTotal(price, tax) {\n  return price + (price * tax);\n}\n\n// Function 2\nconst calculateTotal = function(price, tax) {\n  return price + (price * tax);\n};\n\n// Function 3\nconst calculateTotal = (price, tax) => price + (price * tax);\n```\n\nWhat are the key differences between these approaches? When would you choose one over the others?"
+      },
+      {
+        "id": "q9",
+        "question": "# Debugging Web Pages\n\nA user reports that your webpage isn't displaying correctly. The images aren't loading and the styles look broken.\n\n1. What are the first three things you would check in the browser's developer tools?\n2. If you discovered that a CSS file was not loading, what might be the cause and how would you fix it?\n3. How would you debug a JavaScript error that appears in the console?"
+      },
+      {
+        "id": "q10",
+        "question": "# Web Performance\n\nYou've built a simple webpage, but it's loading slowly. Identify three common performance issues that might be causing this and explain how you would measure and improve each one.\n\nFor each issue, provide a specific example of what the problem might look like in code and how you would fix it."
+      }
+    ]
+  }
