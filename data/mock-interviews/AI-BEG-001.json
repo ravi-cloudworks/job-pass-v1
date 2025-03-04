@@ -21,7 +21,7 @@
       },
       {
         "id": "q5",
-        "question": "# Ethical Considerations in AI\n\nWatch this short video on AI bias:\n\n[AI Ethics: Bias and Fairness](https://www.youtube.com/watch?v=59bMh59JQDo)\n\n1. Define algorithmic bias and explain how it can arise in machine learning systems\n2. Consider this scenario: You're developing a model to help screen job applicants for a technical position. What ethical considerations should you address?\n3. How would you:\n   - Test for bias in your model\n   - Mitigate any biases discovered\n   - Create transparency around how the model makes decisions\n4. Discuss the tension between model explainability and performance\n5. What regulations or guidelines exist regarding ethical AI development?\n6. Beyond bias, what other ethical considerations are important in AI development?"
+        "question": "# Ethical Considerations in AI\n\nWatch this short video on AI bias:\n\n![AI Ethics: Bias and Fairness](https://www.youtube.com/watch?v=59bMh59JQDo)\n\n1. Define algorithmic bias and explain how it can arise in machine learning systems\n2. Consider this scenario: You're developing a model to help screen job applicants for a technical position. What ethical considerations should you address?\n3. How would you:\n   - Test for bias in your model\n   - Mitigate any biases discovered\n   - Create transparency around how the model makes decisions\n4. Discuss the tension between model explainability and performance\n5. What regulations or guidelines exist regarding ethical AI development?\n6. Beyond bias, what other ethical considerations are important in AI development?"
       }
     ]
   }
