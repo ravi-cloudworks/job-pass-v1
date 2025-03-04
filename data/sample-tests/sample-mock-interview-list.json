@@ -1,0 +1,32 @@
+[
+    {
+      "id": "FRONT-BEG-001",
+      "name": "Frontend Development Fundamentals",
+      "file": "FRONT-BEG-001.json"
+    },
+    {
+      "id": "BACK-BEG-001",
+      "name": "Backend Development Basics",
+      "file": "BACK-BEG-001.json"
+    },
+    {
+      "id": "DEVOPS-MID-001",
+      "name": "DevOps Intermediate Concepts",
+      "file": "DEVOPS-MID-001.json"
+    },
+    {
+      "id": "FULLSTACK-ADV-001",
+      "name": "Advanced Full Stack Development",
+      "file": "FULLSTACK-ADV-001.json"
+    },
+    {
+      "id": "AI-BEG-001",
+      "name": "AI Development Introduction",
+      "file": "AI-BEG-001.json"
+    },
+    {
+      "id": "DB-MID-001",
+      "name": "Database Design & Optimization",
+      "file": "DB-MID-001.json"
+    }
+  ]
