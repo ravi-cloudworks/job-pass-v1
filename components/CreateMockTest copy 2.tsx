@@ -28,8 +28,7 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle,
-  ImageOff,
-  Image as ImageIcon
+  ImageOff
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { motion, AnimatePresence } from "framer-motion"
@@ -43,7 +42,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-
 
 interface Template {
   id: string
@@ -71,38 +69,30 @@ interface ValidationError {
 
 // Predefined categories
 const PREDEFINED_CATEGORIES = [
-  "Absolute Beginners",
-  "Web Development",
-  "Frameworks",
-  "Languages Platforms",
-  "Devops",
-  "Mobile Development",
-  "Databases",
-  "Computer Science",
-  "Machine Learning",
-  "Management",
-  "Game Development",
-  "Design",
-  "Block Chain",
-  "Cyber Security"
+  "Frontend Development",
+  "Backend Development",
+  "DevOps",
+  "Full Stack Development",
+  "AI Development",
+  "Database Design"
 ];
 
 // Max character limits
-const MAX_CHARS = 5000;
+const MAX_CHARS = 7500;
 const MAX_QUESTIONS = 30;
 
 // Trusted domains for images
 const TRUSTED_DOMAINS = [
-  // 'miro.medium.com',
-  // 'cdn.educba.com',
-  // 'assets.digitalocean.com',
-  // 'www.washington.edu',
-  // 'cdn-images-1.medium.com',
-  // 'cdn.jsdelivr.net',
-  // 'd2slcw3kip6qmk.cloudfront.net',
-  // 'mdn.mozillademos.org',
-  // 'www.tutorialspoint.com',
-  'i.imgur.com' //Add more trusted domains as needed
+  'miro.medium.com',
+  'cdn.educba.com',
+  'assets.digitalocean.com',
+  'www.washington.edu',
+  'cdn-images-1.medium.com',
+  'cdn.jsdelivr.net',
+  'd2slcw3kip6qmk.cloudfront.net',
+  'mdn.mozillademos.org',
+  'www.tutorialspoint.com',
+  // Add more trusted domains as needed
 ];
 
 export default function CreateMockTest() {
@@ -197,15 +187,22 @@ export default function CreateMockTest() {
 
         // Try to load the image
         console.log(`[IMAGE_CHECK] Checking if image can be loaded: ${url}`);
-        const img = new Image();
-
         const isValid = await new Promise<boolean>((resolve) => {
-          //  img = new Image();
-          img.onload = () => resolve(true);
-          img.onerror = () => resolve(false);
+          const img = new Image();
+          img.onload = () => {
+            console.log(`[IMAGE_CHECK] Image loaded successfully: ${url}`);
+            resolve(true);
+          };
+          img.onerror = () => {
+            console.log(`[IMAGE_CHECK] Image failed to load: ${url}`);
+            resolve(false);
+          };
           img.src = url;
           // Set a timeout in case the image hangs
-          setTimeout(() => resolve(false), 5000);
+          setTimeout(() => {
+            console.log(`[IMAGE_CHECK] Image load timeout: ${url}`);
+            resolve(false);
+          }, 5000);
         });
 
         if (!isValid) {
@@ -231,13 +228,13 @@ export default function CreateMockTest() {
 
   // Fix validateContent to avoid dependency on state and prevent race conditions
   const validateContent = async (content: string): Promise<ValidationError[]> => {
-    console.log(`[VALIDATE] Starting image validation on content (${content.length} chars)`);
+    console.log(`[VALIDATE] Starting validation on content (${content.length} chars)`);
     const errors: ValidationError[] = [];
     setIsValidating(true);
     setValidationProgress(0);
 
     try {
-      // 1. Check character limit (keeping this as it's simple and important)
+      // 1. Check character limit
       if (content.length > MAX_CHARS) {
         console.log(`[VALIDATE] Character limit exceeded: ${content.length}/${MAX_CHARS}`);
         errors.push({
@@ -245,9 +242,9 @@ export default function CreateMockTest() {
           message: `Content exceeds maximum ${MAX_CHARS} characters (${content.length} chars)`,
         });
       }
-      setValidationProgress(30);
+      setValidationProgress(20);
 
-      // 2. Count questions (simple check, useful for UI feedback)
+      // 2. Check question count
       const questions = content.split('---').filter(q => q.trim().length > 0);
       console.log(`[VALIDATE] Found ${questions.length} questions`);
 
@@ -258,9 +255,41 @@ export default function CreateMockTest() {
           message: `Too many questions: ${questions.length}/${MAX_QUESTIONS} maximum`,
         });
       }
-      setValidationProgress(60);
+      setValidationProgress(35);
 
-      // 3. Check image URLs - this is the main validation we need
+      // 3. Check for empty questions
+      questions.forEach((q, idx) => {
+        if (q.trim().length === 0) {
+          console.log(`[VALIDATE] Empty question at index ${idx + 1}`);
+          errors.push({
+            type: 'empty_question',
+            message: `Question ${idx + 1} is empty`,
+            line: content.split('\\n').findIndex(line => line.includes('---')) + 1,
+          });
+        }
+      });
+      setValidationProgress(50);
+
+      // 4. Check for unmatched markdown delimiters
+      // 4.1 Code blocks
+      const codeBlockCount = (content.match(/```/g) || []).length;
+      console.log(`[VALIDATE] Found ${codeBlockCount} code block delimiters`);
+
+      if (codeBlockCount % 2 !== 0) {
+        console.log(`[VALIDATE] Unmatched code block delimiters`);
+        errors.push({
+          type: 'unmatched_delimiter',
+          message: 'Unmatched code block delimiter (```).',
+          line: content.lastIndexOf('```'),
+        });
+      }
+
+      // 4.2 Check for other potential delimiter issues
+      // Add more delimiter checks here if needed
+
+      setValidationProgress(65);
+
+      // 5. Check image URLs - this must be the last step
       console.log(`[VALIDATE] Checking image URLs...`);
       const brokenUrls = await checkImageUrls(content);
       if (brokenUrls.length > 0) {
@@ -528,78 +557,20 @@ Explain your approach.
     parseMarkdownToJson();
   }, [markdownContent]);
 
-  // Simple paste handler for image URLs with proper TypeScript typing
-  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    // Log that the paste event was triggered
-    console.log('[PASTE] Paste event triggered');
-
-    // Get pasted content
-    const pastedText = e.clipboardData.getData('text');
-    console.log('[PASTE] Pasted text:', pastedText);
-
-    // Check if it looks like a URL
-    if (pastedText.trim().startsWith('http')) {
-      console.log('[PASTE] Text appears to be a URL');
-
-      // A more flexible check for image URLs
-      const hasImageExtension = /(jpg|jpeg|png|gif|webp|svg)/i.test(pastedText);
-      const hasImageKeyword = /(image|photo|picture)/i.test(pastedText);
-
-      console.log('[PASTE] Has image extension:', hasImageExtension);
-      console.log('[PASTE] Has image keyword:', hasImageKeyword);
-
-      if (hasImageExtension || hasImageKeyword) {
-        console.log('[PASTE] Converting to markdown image format');
-        e.preventDefault(); // Prevent default paste
-
-        // Get cursor position
-        const textarea = e.currentTarget;
-        const cursorPos = textarea.selectionStart || 0;
-        console.log('[PASTE] Cursor position:', cursorPos);
-
-        // Get text before and after cursor
-        const textBefore = textarea.value.substring(0, cursorPos);
-        const textAfter = textarea.value.substring(cursorPos);
-
-        // Convert to markdown image format
-        const markdownImage = `![](${pastedText.trim()})`;
-        console.log('[PASTE] Generated markdown:', markdownImage);
-
-        // Create new content
-        const newContent = textBefore + markdownImage + textAfter;
-
-        // Update the state
-        setMarkdownContent(newContent);
-
-        // Move cursor after the inserted text
-        setTimeout(() => {
-          textarea.selectionStart = cursorPos + markdownImage.length;
-          textarea.selectionEnd = cursorPos + markdownImage.length;
-        }, 0);
-
-        // Show confirmation
-        toast({
-          title: "URL Converted",
-          description: "Converted URL to markdown image format",
-        });
-      }
-    }
-  };
-
   // Define the URL replacement function
   const handleUrlReplacement = async (oldUrl: string, newUrl: string, inputElement: HTMLInputElement) => {
     console.log(`[FIX] Starting URL replacement: ${oldUrl} -> ${newUrl}`);
-
+    
     // Get current content before replacement
     const currentContent = markdownContent;
-
+    
     // Create pattern and replace
     const pattern = new RegExp(`!\\[.*?\\]\\(${oldUrl.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\)`, 'g');
     const updatedContent = currentContent.replace(pattern, (match) => {
       console.log(`[FIX] Replacing: ${match}`);
       return match.replace(oldUrl, newUrl);
     });
-
+    
     // Check if anything actually changed
     if (updatedContent === currentContent) {
       console.log(`[FIX] No matches found for URL: ${oldUrl}`);
@@ -611,38 +582,40 @@ Explain your approach.
       inputElement.value = '';
       return;
     }
-
-    // Clear broken images list to avoid stale UI
+    
+    // IMPORTANT - Clear existing broken images and validation errors
     setBrokenImages([]);
     setValidationErrors([]);
-
-    // Update content state
-    console.log(`[FIX] Setting updated content`);
+    
+    // Update markdown content
+    console.log(`[FIX] Setting updated content (${updatedContent.length} chars)`);
     setMarkdownContent(updatedContent);
     inputElement.value = '';
-
+    
     // Wait for state update
     await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Directly check for broken images
-    console.log(`[FIX] Checking for remaining broken images`);
-    const remainingBrokenUrls = await checkImageUrls(updatedContent);
-
-    // Update validation errors based on image validation
-    const validationErrors = await validateContent(updatedContent);
-    setValidationErrors(validationErrors);
-
-    // Show appropriate message based on result
-    if (remainingBrokenUrls.length === 0) {
+    
+    // The key fix: directly use the updated content for validation, not reading from state
+    console.log(`[FIX] Manually validating updated content`);
+    const brokenUrls = await checkImageUrls(updatedContent);
+    
+    // If there are no broken images, validation passes
+    if (brokenUrls.length === 0) {
+      console.log(`[FIX] No broken images found after replacement`);
       toast({
         title: "URL replaced",
-        description: "All image issues resolved",
+        description: "Image URL successfully updated",
       });
     } else {
+      console.log(`[FIX] Found ${brokenUrls.length} broken URLs after replacement`);
+      // Run full validation with the updated content
+      const errors = await validateContent(updatedContent);
+      setValidationErrors(errors);
+      
       toast({
-        title: "URL replaced",
-        description: `Fixed URL but ${remainingBrokenUrls.length} image issues remain`,
-        variant: "destructive",
+        title: "URL replaced with issues",
+        description: `Fixed URL but found ${brokenUrls.length} other image issues`,
+        variant: "destructive"
       });
     }
   };
@@ -656,39 +629,6 @@ Explain your approach.
       default: return '⭐';
     }
   }
-  const handleConvertUrlToImage = () => {
-    // Get the textarea
-    const textarea = document.getElementById('markdown-editor') as HTMLTextAreaElement;
-    if (!textarea) return;
-
-    // Get selected text or prompt for URL
-    let url = window.getSelection()?.toString().trim() || '';
-
-    if (!url) {
-      url = window.prompt('Enter image URL:') || '';
-    }
-
-    if (url && url.startsWith('http')) {
-      // Get cursor position
-      const cursorPos = textarea.selectionStart || 0;
-      const textBefore = textarea.value.substring(0, cursorPos);
-      const textAfter = textarea.value.substring(cursorPos);
-
-      // Create markdown image
-      const markdownImage = `![](${url})`;
-
-      // Update content
-      const newContent = textBefore + markdownImage + textAfter;
-      setMarkdownContent(newContent);
-
-      // Focus and set cursor
-      setTimeout(() => {
-        textarea.focus();
-        textarea.selectionStart = cursorPos + markdownImage.length;
-        textarea.selectionEnd = cursorPos + markdownImage.length;
-      }, 0);
-    }
-  };
 
   // Format time as MM:SS
   const formatTime = (seconds: number) => {
@@ -820,10 +760,10 @@ Explain your approach.
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="template">Want to Quick Start? </Label>
+                  <Label htmlFor="template">Want to start fast? </Label>
                   <Select onValueChange={loadTemplate}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select Quick Start Template" />
+                      <SelectValue placeholder="Select Fast Start Template" />
                     </SelectTrigger>
                     <SelectContent>
                       {templates.map((template) => (
@@ -841,7 +781,7 @@ Explain your approach.
                 <Tabs defaultValue="editor">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="editor">Editor</TabsTrigger>
-                    <TabsTrigger value="guide">Questions Guide</TabsTrigger>
+                    <TabsTrigger value="guide">Markdown Guide</TabsTrigger>
                   </TabsList>
                   <TabsContent value="editor" className="space-y-4 pt-4">
                     <div className="flex justify-between items-center">
@@ -885,7 +825,6 @@ Explain your approach.
                     </div>
 
                     <Textarea
-                      id="markdown-editor"
                       value={markdownContent}
                       onChange={(e) => {
                         // Allow deletion even if over the limit
@@ -893,27 +832,9 @@ Explain your approach.
                           setMarkdownContent(e.target.value)
                         }
                       }}
-                      onPaste={handlePaste} // Add this line
                       placeholder="Enter your questions here..."
                       className="min-h-[400px] font-mono text-sm"
                     />
-                    {/* <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleConvertUrlToImage}
-                      title="Convert selected URL to image or enter a new URL"
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleConvertUrlToImage}
-                        title="Convert selected URL to image or enter a new URL"
-                      >
-                        <ImageIcon className="h-4 w-4 mr-1" />
-                        URL to Image
-                      </Button>
-                      URL to Image
-                    </Button> */}
 
                     <div className="text-xs text-muted-foreground">
                       Use --- to separate questions
@@ -1061,7 +982,7 @@ Explain your approach.
               disabled={validationErrors.length > 0 || isValidating}
             >
               {/* <Download className="mr-2 h-4 w-4" /> */}
-              Create Mock Interview
+              Download JSON
             </Button>
           </CardFooter>
         </Card>
@@ -1117,17 +1038,19 @@ Explain your approach.
                     <div className="flex-grow overflow-y-auto mb-4">
                       <div
                         dangerouslySetInnerHTML={{
-                          __html: `
-                          <style>
-                            .md-content h1 { font-size: 1.8em; font-weight: bold; margin-bottom: 0.5em; }
-                            .md-content h2 { font-size: 1.5em; font-weight: bold; margin-bottom: 0.5em; }
-                            .md-content pre { background-color: #f4f4f4; padding: 1rem; border-radius: 4px; }
-                            .md-content ul { list-style-type: disc; margin-left: 1.5em; }
-                            .md-content ol { list-style-type: decimal; margin-left: 1.5em; }
-                            .md-content code { background-color: #f4f4f4; padding: 0.2em 0.4em; border-radius: 3px; font-family: monospace; }
-                          </style>
-                          <div class="md-content">${marked(previewJson.questions[currentQuestionIndex]?.question || "")}</div>
-                        `
+                          __html: DOMPurify.sanitize(`
+                            <style>
+                              .md-content h1 { font-size: 1.8em; font-weight: bold; margin-bottom: 0.5em; }
+                              .md-content h2 { font-size: 1.5em; font-weight: bold; margin-bottom: 0.5em; }
+                              .md-content pre { background-color: #f4f4f4; padding: 1rem; border-radius: 4px; }
+                              .md-content ul { list-style-type: disc; margin-left: 1.5em; }
+                              .md-content ol { list-style-type: decimal; margin-left: 1.5em; }
+                              .md-content code { background-color: #f4f4f4; padding: 0.2em 0.4em; border-radius: 3px; font-family: monospace; }
+                              .md-content img { max-width: 100%; height: auto; border-radius: 4px; }
+                              .md-content pre code { background-color: transparent; padding: 0; }
+                            </style>
+                            <div class="md-content">${marked(previewJson.questions[currentQuestionIndex]?.question || "")}</div>
+                          `)
                         }}
                         className="question-content"
                       />

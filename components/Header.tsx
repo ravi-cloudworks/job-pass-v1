@@ -47,6 +47,11 @@ export default function Header() {
                   Create Custom Mock Test
                 </Link>
               </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/earnings" className="w-full">
+                  How much you can earn more?
+                </Link>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="outline" asChild>
