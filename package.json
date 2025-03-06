@@ -48,6 +48,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
+    "crisp-sdk-web": "^1.0.25",
     "date-fns": "latest",
     "embla-carousel-react": "8.5.1",
     "framer-motion": "^12.0.6",

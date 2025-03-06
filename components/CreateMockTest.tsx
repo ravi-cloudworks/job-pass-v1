@@ -101,7 +101,7 @@ const TRUSTED_DOMAINS = [
   // 'cdn.jsdelivr.net',
   // 'd2slcw3kip6qmk.cloudfront.net',
   // 'mdn.mozillademos.org',
-  // 'www.tutorialspoint.com',
+  'i.postimg.cc',
   'i.imgur.com' //Add more trusted domains as needed
 ];
 
