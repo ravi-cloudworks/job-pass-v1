@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Bot, User, Clock } from "lucide-react"
 import { Alert, AlertTitle } from "@/components/ui/alert"
+import { getCompanyIdFromUrl } from "@/utils/chatbotFlow"
 import {
   AlertDialog,
   AlertDialogContent,
@@ -15,10 +16,19 @@ import {
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog"
 import { motion, AnimatePresence } from "framer-motion"
-import { getNode, getOptionText, getQuestionSetId, type ChatbotNode } from "@/utils/chatbotFlow"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+
+import { 
+  getNode, 
+  getOptionText, 
+  getQuestionSetId, 
+  chatbotFlow, 
+  type ChatbotNode 
+} from "@/utils/chatbotFlow"
+
+import companyRegistry from "../config/company-registry.json";
 
 interface ChatMessage {
   role: "ai" | "user";
@@ -43,10 +53,10 @@ const COMPLEXITY_MINUTES = {
 
 const validatePrepaidCode = async (code: string): Promise<boolean> => {
   // Dummy validation that always returns true
-  // TODO: Replace with actual validation logic
   await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call delay
   return true;
 }
+
 
 // Typing effect component
 function TypingEffect({ text, messageIndex, onComplete }: {
@@ -109,6 +119,7 @@ function TypingEffect({ text, messageIndex, onComplete }: {
 }
 
 export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
+  // Move all state declarations inside the component
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [currentNode, setCurrentNode] = useState<ChatbotNode>(getNode("root"))
   const [isAiThinking, setIsAiThinking] = useState(false)
@@ -120,14 +131,26 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
   const [showPrepaidCodeDialog, setShowPrepaidCodeDialog] = useState(false)
   const [prepaidCode, setPrepaidCode] = useState("")
   const [displayedTextMap, setDisplayedTextMap] = useState<{ [key: number]: string }>({})
+  const [isFlowReady, setIsFlowReady] = useState(false)
+  const [flowError, setFlowError] = useState<string | null>(null)
+  const [isProcessingComplexity, setIsProcessingComplexity] = useState(false)
 
   const handleTypingComplete = useCallback((index: number, text: string) => {
     setDisplayedTextMap(prev => ({ ...prev, [index]: text }));
   }, []);
 
-
-  const [isProcessingComplexity, setIsProcessingComplexity] = useState(false);
-
+  useEffect(() => {
+    // Explicitly reset chat history when chatbotFlow changes
+    const rootNode = getNode("root");
+    setChatHistory([
+      {
+        role: "ai",
+        content: rootNode.question,
+        options: [...(rootNode.options || [])],
+      }
+    ]);
+    console.log("Chat history reset with new flow data");
+  }, [chatbotFlow]); // Dependency on chatbotFlow
 
   useEffect(() => {
     // Check if the current node is the root node by comparing with the root node object
@@ -149,6 +172,94 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
+  // Create refs outside of useEffect but inside component
+  const mounted = useRef(true);
+  
+  // IMPORTANT: Debug log to check if component is mounted
+  console.log("📢 Chat component is mounting");
+  
+  // IMPORTANT: Automatically set ready state after 5 seconds (failsafe)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (!isFlowReady && mounted.current) {
+        console.log("⚠️ Failsafe: Setting flow ready after timeout");
+        setIsFlowReady(true);
+      }
+    }, 5000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [isFlowReady]);
+
+  useEffect(() => {
+    console.log("🎧 Setting up event listeners for flow");
+    
+    // Listen for when company flow is ready
+    const handleFlowReady = (event: Event) => {
+      console.log("✅ Received company-flow-ready event");
+      setIsFlowReady(true);
+    };
+    
+    const handleFlowError = (event: CustomEvent<{error: string}>) => {
+      // Make sure component is still mounted
+      if (mounted.current) {
+        console.log("❌ Received company-flow-error event:", event.detail.error);
+        setFlowError(event.detail.error);
+        setIsFlowReady(true); // Remove loading screen
+      }
+    };
+
+    // Check for invalid company ID directly in this effect
+    const companyId = getCompanyIdFromUrl();
+    console.log(`🔍 Chat component checking company_id: "${companyId}"`);
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('company-flow-ready', handleFlowReady);
+      window.addEventListener('company-flow-error', handleFlowError as EventListener);
+      
+      if (companyId && !(companyRegistry?.companies && companyId in companyRegistry.companies)) {
+        console.log(`❌ Invalid company ID in Chat component: "${companyId}"`);
+        setFlowError(`Invalid company ID: "${companyId}"`);
+        setIsFlowReady(true);
+      } else if (!companyId) {
+        console.log("ℹ️ No company ID, proceeding with default flow");
+        // This case should be handled by the event, but as a fallback:
+        // Check if chatbotFlow is already initialized
+        if (chatbotFlow && chatbotFlow.nodes && chatbotFlow.nodes.root) {
+          console.log("✅ Default flow already initialized, setting ready");
+          setIsFlowReady(true);
+        }
+      } else {
+        console.log(`✓ Valid company ID found: "${companyId}", waiting for flow ready event`);
+        // If we have a valid company ID, we'll manually trigger a check after a short delay
+        // just to handle any potential race conditions
+        setTimeout(() => {
+          if (!isFlowReady && mounted.current) {
+            console.log("⏱️ Checking flow status after delay...");
+            // Check if chatbotFlow has been populated with company-specific data
+            if (chatbotFlow && chatbotFlow.metadata?.company === companyRegistry.companies[companyId as keyof typeof companyRegistry.companies]?.name) {
+              console.log("✅ Company flow already loaded, setting ready state");
+              setIsFlowReady(true);
+            }
+          }
+        }, 1000);
+      }
+    } else {
+      // Set flow ready even in SSR to avoid blocking
+      console.log("🖥️ In SSR environment, setting flow ready");
+      setIsFlowReady(true);
+    }
+    
+    return () => {
+      console.log("🧹 Cleaning up event listeners");
+      mounted.current = false;
+      
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('company-flow-ready', handleFlowReady);
+        window.removeEventListener('company-flow-error', handleFlowError as EventListener);
+      }
+    };
+  }, []); // No dependencies needed
+  
   useEffect(() => {
     scrollToBottom()
   }, [chatHistory, displayedTextMap])
@@ -410,6 +521,30 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
 
   return (
     <div className="flex flex-col h-full bg-background">
+    {!isFlowReady ? (
+      <div className="flex items-center justify-center h-full">
+        <div className="space-y-3">
+          <div className="flex space-x-2 items-center">
+            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+            <span className="text-sm text-gray-500 ml-2">Loading chat interface...</span>
+          </div>
+        </div>
+      </div>
+    ) : flowError ? (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center p-6 max-w-md">
+          <div className="text-red-500 text-4xl mb-4">⚠️</div>
+          <h3 className="text-lg font-medium text-red-800 mb-2">Error Loading Chat</h3>
+          <p className="text-gray-600 mb-4">{flowError}</p>
+          <p className="text-sm text-gray-500">
+            Please check the company ID in your URL or contact support for assistance.
+          </p>
+        </div>
+      </div>
+    ) : (
+      <>
       <div className="py-3 px-4 border-b">
         <Alert className="border-primary/20 bg-primary/5">
           <Clock className="h-4 w-4 text-primary" />
@@ -570,12 +705,11 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </>
+    )}
     </div>
   )
 }
-
-
-
 function ThinkingAnimation() {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
@@ -613,7 +747,7 @@ function ThinkingAnimation() {
     return () => {
       clearInterval(progressionInterval);
     };
-  }, [startTime]); // Only depend on startTime
+  }, [startTime, steps.length]); // Only depend on startTime and steps.length
 
   return (
     <div className="space-y-3">
