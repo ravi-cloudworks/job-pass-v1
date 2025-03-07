@@ -11,6 +11,9 @@ import PricingSection from "@/components/sections/PricingSection"
 import FaqSection from "@/components/sections/FaqSection"
 import CtaSection from "@/components/sections/CtaSection"
 import FooterSection from "@/components/sections/FooterSection"
+import CountryUseCases from "@/components/sections/CountryUseCases"
+
+
 import VideoReviewTool from "@/components/VideoReviewTool"
 
 export default function Home() {
@@ -27,6 +30,7 @@ export default function Home() {
       {/* Section 4: The New Way */}
       <NewWaySection />
       
+      <CountryUseCases/>
       {/* Section 5: How It Works */}
       <HowItWorksSection />
       
