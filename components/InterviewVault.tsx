@@ -9,7 +9,7 @@ import { motion } from "framer-motion"
 import MockInterviewModal from "./MockInterviewModal"
 import ViewMockInterviewModal from "./ViewMockInterviewModal"
 
-type ComplexityLevel = 'Easy' | 'Medium' | 'Hard';
+type ComplexityLevel = 'Easy' | 'Medium' | 'Advanced';
 
 interface ImageData {
   url: string
@@ -173,7 +173,7 @@ export default function InterviewVault({
     switch(complexity) {
       case 'Easy': return '⭐';
       case 'Medium': return '⭐⭐';
-      case 'Hard': return '⭐⭐⭐';
+      case 'Advanced': return '⭐⭐⭐';
       default: return '⭐';
     }
   }

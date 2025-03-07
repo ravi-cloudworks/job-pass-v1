@@ -625,7 +625,7 @@ Explain your approach.
     switch (complexity) {
       case 'Easy': return '⭐';
       case 'Medium': return '⭐⭐';
-      case 'Hard': return '⭐⭐⭐';
+      case 'Advanced': return '⭐⭐⭐';
       default: return '⭐';
     }
   }
@@ -701,7 +701,7 @@ Explain your approach.
                       <SelectContent>
                         <SelectItem value="Easy">Easy</SelectItem>
                         <SelectItem value="Medium">Medium</SelectItem>
-                        <SelectItem value="Hard">Hard</SelectItem>
+                        <SelectItem value='Advanced'>Advanced</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -519,7 +519,7 @@ export default function MockInterviewModal({
     switch (complexity) {
       case 'Easy': return '⭐';
       case 'Medium': return '⭐⭐';
-      case 'Hard': return '⭐⭐⭐';
+      case 'Advanced': return '⭐⭐⭐';
       default: return '⭐';
     }
   }

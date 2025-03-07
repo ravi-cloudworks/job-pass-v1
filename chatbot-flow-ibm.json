@@ -30,21 +30,21 @@
           "standard": {
             "easy": ["IBM-CLOUD-001"],
             "medium": ["IBM-CLOUD-002"],
-            "hard": ["IBM-CLOUD-003"]
+            "Advanced": ["IBM-CLOUD-003"]
           }
         },
         "cloud_functions": {
           "standard": {
             "easy": ["IBM-FUNCTION-001"],
             "medium": ["IBM-FUNCTION-002"],
-            "hard": ["IBM-FUNCTION-003"]
+            "Advanced": ["IBM-FUNCTION-003"]
           }
         },
         "cloud_databases": {
           "standard": {
             "easy": ["IBM-DB-001"],
             "medium": ["IBM-DB-002"],
-            "hard": ["IBM-DB-003"]
+            "Advanced": ["IBM-DB-003"]
           }
         }
       }
@@ -63,21 +63,21 @@
           "standard": {
             "easy": ["IBM-ASSISTANT-001"],
             "medium": ["IBM-ASSISTANT-002"],
-            "hard": ["IBM-ASSISTANT-003"]
+            "Advanced": ["IBM-ASSISTANT-003"]
           }
         },
         "watson_discovery": {
           "standard": {
             "easy": ["IBM-DISCOVERY-001"],
             "medium": ["IBM-DISCOVERY-002"],
-            "hard": ["IBM-DISCOVERY-003"]
+            "Advanced": ["IBM-DISCOVERY-003"]
           }
         },
         "watson_studio": {
           "standard": {
             "easy": ["IBM-STUDIO-001"],
             "medium": ["IBM-STUDIO-002"],
-            "hard": ["IBM-STUDIO-003"]
+            "Advanced": ["IBM-STUDIO-003"]
           }
         }
       }
@@ -96,21 +96,21 @@
           "standard": {
             "easy": ["IBM-OPENSHIFT-001"],
             "medium": ["IBM-OPENSHIFT-002"],
-            "hard": ["IBM-OPENSHIFT-003"]
+            "Advanced": ["IBM-OPENSHIFT-003"]
           }
         },
         "ansible": {
           "standard": {
             "easy": ["IBM-ANSIBLE-001"],
             "medium": ["IBM-ANSIBLE-002"],
-            "hard": ["IBM-ANSIBLE-003"]
+            "Advanced": ["IBM-ANSIBLE-003"]
           }
         },
         "linux": {
           "standard": {
             "easy": ["IBM-LINUX-001"],
             "medium": ["IBM-LINUX-002"],
-            "hard": ["IBM-LINUX-003"]
+            "Advanced": ["IBM-LINUX-003"]
           }
         }
       }
@@ -128,14 +128,14 @@
           "standard": {
             "easy": ["IBM-QISKIT-001"],
             "medium": ["IBM-QISKIT-002"],
-            "hard": ["IBM-QISKIT-003"]
+            "Advanced": ["IBM-QISKIT-003"]
           }
         },
         "quantum_algorithms": {
           "standard": {
             "easy": ["IBM-QUANTUM-001"],
             "medium": ["IBM-QUANTUM-002"],
-            "hard": ["IBM-QUANTUM-003"]
+            "Advanced": ["IBM-QUANTUM-003"]
           }
         }
       }
@@ -152,7 +152,7 @@
           "standard": {
             "easy": ["IBM-FABRIC-001"],
             "medium": ["IBM-FABRIC-002"],
-            "hard": ["IBM-FABRIC-003"]
+            "Advanced": ["IBM-FABRIC-003"]
           }
         }
       }

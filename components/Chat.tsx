@@ -48,7 +48,7 @@ interface ChatProps {
 const COMPLEXITY_MINUTES = {
   Easy: 15,
   Medium: 30,
-  Hard: 45
+  Advanced: 45
 }
 
 const validatePrepaidCode = async (code: string): Promise<boolean> => {
@@ -459,16 +459,16 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
         disabled={isProcessingComplexity && (
           option === "Easy" ||
           option === "Medium" ||
-          option === "Hard" ||
+          option === 'Advanced' ||
           option === "start_over"
         )}
         className={`w-full text-left justify-start text-xs 
-    ${isProcessingComplexity && (option === "Easy" || option === "Medium" || option === "Hard" || option === "start_over")
+    ${isProcessingComplexity && (option === "Easy" || option === "Medium" || option === 'Advanced' || option === "start_over")
             ? "opacity-50 cursor-not-allowed" // Add disabled styling
             : "hover:scale-102 transition-transform"
           } ${option === "use_prepaid_code"
             ? "bg-primary hover:bg-primary/90 text-primary-foreground"
-            : option === "Easy" || option === "Medium" || option === "Hard"
+            : option === "Easy" || option === "Medium" || option === 'Advanced'
               ? "bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-800"
               : option === "start_over"
                 ? "bg-gray-100 hover:bg-gray-200 text-gray-800"
@@ -478,13 +478,13 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
           if (isProcessingComplexity && (
             option === "Easy" ||
             option === "Medium" ||
-            option === "Hard" ||
+            option === 'Advanced' ||
             option === "start_over"
           )) {
             return; // Additional guard in onClick
           } else if (option === "use_prepaid_code") {
             handlePaymentOption(option);
-          } else if (option === "Easy" || option === "Medium" || option === "Hard") {
+          } else if (option === "Easy" || option === "Medium" || option === 'Advanced') {
             handleComplexitySelection(option);
           } else {
             handleOptionClick(option);
@@ -501,7 +501,7 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
             <span className="mr-2 text-xs">🔄</span>
             <span>{getOptionText(option)}</span>
           </div>
-        ) : option === "Easy" || option === "Medium" || option === "Hard" ? (
+        ) : option === "Easy" || option === "Medium" || option === 'Advanced' ? (
           <div className="flex items-center">
             <span className="mr-2 text-xs">{option === "Easy" ? "⭐" : option === "Medium" ? "⭐⭐" : "⭐⭐⭐"}</span>
             <span>{option}</span>

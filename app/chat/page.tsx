@@ -13,7 +13,7 @@ interface ImageData {
   isCompleted: boolean
   videoUrl?: string
   questionSetId?: string
-  complexity: 'Easy' | 'Medium' | 'Hard'
+  complexity: 'Easy' | 'Medium' | 'Advanced'
   category: string
 }
 
@@ -40,7 +40,7 @@ export default function ChatPage() {
         isFavorite: false,
         isCompleted: false,
         questionSetId: questionSetId,
-        complexity: (complexity as 'Easy' | 'Medium' | 'Hard') || 'Easy',
+        complexity: (complexity as 'Easy' | 'Medium' | 'Advanced') || 'Easy',
         category: category || 'General Interview'
       }
 
