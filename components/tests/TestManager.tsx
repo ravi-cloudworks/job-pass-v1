@@ -33,6 +33,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { Progress } from "@/components/ui/progress"
 
 // Constants
 const MAX_CHARS = 5000;
@@ -82,6 +83,7 @@ interface TestContent {
 interface ValidationError {
   type: string;
   message: string;
+  line?: number;
 }
 
 // Add this near your other interfaces
@@ -216,6 +218,14 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
   const [showValidationProgress, setShowValidationProgress] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
 
+  const [showImageFixDialog, setShowImageFixDialog] = useState(false);
+ 
+  interface ValidationError {
+    type: string;
+    message: string;
+    line?: number;
+  }
+  
   // Complexity content state
   const [complexityContent, setComplexityContent] = useState<{
     [key: string]: { markdown: string, preview: any | null }
@@ -226,30 +236,35 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
   });
 
   // In your component, add state for broken images
-  const [brokenImages, setBrokenImages] = useState<BrokenImage[]>([]);
+  const [brokenImages, setBrokenImages] = useState<string[]>([]);
 
   // Add this useEffect near other hooks at the top of the component
   useEffect(() => {
     if (activeTab === 'preview') {
-      const validationResult = validateContent(markdownContent);
-      if (validationResult.errors.length > 0) {
-        setValidationErrors(validationResult.errors);
-        setShowValidationDialog(true);
-        setActiveTab('questions');
-      } else {
-        const questions = markdownContent
-          .split('---')
-          .map((q: string, i: number) => ({ id: `q${i+1}`, question: q.trim() }))
-          .filter((q: {id: string, question: string}) => q.question);
-        
-        setPreviewJson({
-          id: selectedNode?.testIds?.[selectedComplexity.toLowerCase() as keyof typeof selectedNode.testIds] || "preview",
-          title: selectedNode?.name || "Preview",
-          time_limit: timeLimit,
-          questions
-        });
-        setCurrentQuestionIndex(0);
-      }
+      const validateAndPreview = async () => {
+        // Validate content before showing preview
+        const validationResult = await enhancedValidateContent(markdownContent);
+        if (validationResult.length > 0) {
+          setValidationErrors(validationResult);
+          setShowValidationDialog(true);
+          setActiveTab('questions');
+        } else {
+          const questions = markdownContent
+            .split('---')
+            .map((q: string, i: number) => ({ id: `q${i+1}`, question: q.trim() }))
+            .filter((q: {id: string, question: string}) => q.question);
+          
+          setPreviewJson({
+            id: selectedNode?.testIds?.[selectedComplexity.toLowerCase() as keyof typeof selectedNode.testIds] || "preview",
+            title: selectedNode?.name || "Preview",
+            time_limit: timeLimit,
+            questions
+          });
+          setCurrentQuestionIndex(0);
+        }
+      };
+      
+      validateAndPreview();
     }
   }, [activeTab, markdownContent]);
 
@@ -816,6 +831,25 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
     setIsSaving(true);
     
     try {
+      // Validate content
+      const validationResult = await enhancedValidateContent(markdownContent);
+      
+      // If there are broken images, show the image fix dialog
+      if (validationResult.some(error => error.type === 'broken_image')) {
+        setValidationErrors(validationResult);
+        setShowImageFixDialog(true);
+        setIsSaving(false);
+        return;
+      }
+      
+      // If there are other validation errors, show the validation dialog
+      if (validationResult.length > 0) {
+        setValidationErrors(validationResult);
+        setShowValidationDialog(true);
+        setIsSaving(false);
+        return;
+      }
+      
       // Get the test ID for the current complexity
       const testId = selectedNode.testIds?.[selectedComplexity.toLowerCase() as keyof typeof selectedNode.testIds];
       
@@ -825,74 +859,10 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
         return;
       }
       
-      // Validate content
-      const validationResult = await enhancedValidateContent(markdownContent);
-      if (validationResult.length > 0) {
-        setValidationErrors(validationResult);
-        setShowValidationDialog(true);
-        setIsSaving(false);
-        return;
-      }
+      // Save the content
+      // ... rest of your save logic
       
-      // Parse questions for preview
-      const questions = markdownContent
-        .split('---')
-        .map((q, i) => ({ id: `q${i+1}`, question: q.trim() }))
-        .filter(q => q.question);
-      
-      const preview = {
-        id: testId,
-        title: selectedNode.name,
-        time_limit: timeLimit,
-        questions: questions
-      };
-      
-      // Check if test exists
-      const { data: existingTest } = await supabase
-        .from("tests")
-        .select("id")
-        .eq("id", testId)
-        .single();
-      
-      if (!existingTest) {
-        // Create new test
-        await supabase
-          .from("tests")
-          .insert({
-            id: testId,
-            title: selectedNode.name,
-            company_id: companyId,
-            complexity: selectedComplexity.toUpperCase(),
-            category: selectedNode.name,
-            time_limit: timeLimit,
-            markdown_content: markdownContent,
-            created_at: new Date().toISOString()
-          });
-      } else {
-        // Update existing test - only include fields that need to be updated
-        await supabase
-          .from("tests")
-          .update({
-            title: selectedNode.name,
-            complexity: selectedComplexity.toUpperCase(),
-            category: selectedNode.name,
-            time_limit: timeLimit,
-            markdown_content: markdownContent
-          })
-          .eq("id", testId);
-      }
-      
-      // Update complexity content
-      setComplexityContent(prev => ({
-        ...prev,
-        [selectedComplexity]: { 
-          markdown: markdownContent, 
-          preview: preview 
-        }
-      }));
-      
-      setPreviewJson(preview);
-      toast.success("Saved successfully");
+      toast.success("Content saved successfully");
     } catch (error) {
       console.error("Error saving content:", error);
       toast.error("Failed to save content");
@@ -1047,11 +1017,26 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
     setShowValidationProgress(0);
 
     try {
-      // 1. Basic checks (existing)
-      // ... character limit and question count checks ...
+      // 1. Basic checks
+      if (content.length > MAX_CHARS) {
+        errors.push({
+          type: 'character_limit',
+          message: `Content exceeds maximum ${MAX_CHARS} characters (${content.length} chars)`,
+        });
+      }
       setShowValidationProgress(20);
 
-      // 2. Image validation (enhanced)
+      // 2. Count questions
+      const questions = content.split('---').filter(q => q.trim().length > 0);
+      if (questions.length > MAX_QUESTIONS) {
+        errors.push({
+          type: 'question_limit',
+          message: `Too many questions: ${questions.length}/${MAX_QUESTIONS} maximum`,
+        });
+      }
+      setShowValidationProgress(40);
+
+      // 3. Image validation
       const brokenUrls = await checkImageUrls(content);
       if (brokenUrls.length > 0) {
         brokenUrls.forEach(url => {
@@ -1061,15 +1046,9 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
           });
         });
       }
-      setShowValidationProgress(40);
-
-      // 3. Markdown structure validation
-      const structureErrors = validateMarkdownStructure(content);
-      errors.push(...structureErrors);
       setShowValidationProgress(60);
 
       // 4. Question format validation
-      const questions = content.split('---').filter(q => q.trim());
       questions.forEach((q, idx) => {
         if (!q.includes('#')) {
           errors.push({
@@ -1077,10 +1056,10 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
             message: `Question ${idx + 1} missing title (# heading)`
           });
         }
-        if (q.length < 50) {
+        if (q.length < 30) {
           errors.push({
             type: 'content',
-            message: `Question ${idx + 1} seems too short`
+            message: `Question ${idx + 1} seems too short (30 characters minimum)`
           });
         }
       });
@@ -1146,13 +1125,223 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
       input.value = ''; // Clear input
       
       // Revalidate content
-      const validationResult = await validateContent(updatedContent);
-      setValidationErrors(validationResult.errors);
+      const validationResult = await enhancedValidateContent(updatedContent);
+      setValidationErrors(validationResult);
       
       toast.success("Image URL has been updated");
+      
+      // If no more broken images, close the dialog
+      if (validationResult.filter(e => e.type === 'broken_image').length === 0) {
+        setShowImageFixDialog(false);
+      }
     } catch (err) {
       toast.error("Please enter a valid URL");
     }
+  };
+
+  // Handle paste for image URLs
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    // Log that the paste event was triggered
+    console.log('[PASTE] Paste event triggered');
+
+    // Get pasted content
+    const pastedText = e.clipboardData.getData('text');
+    console.log('[PASTE] Pasted text:', pastedText);
+
+    // Check if it looks like a URL
+    if (pastedText.trim().startsWith('http')) {
+      console.log('[PASTE] Text appears to be a URL');
+
+      // A more flexible check for image URLs
+      const hasImageExtension = /(jpg|jpeg|png|gif|webp|svg)/i.test(pastedText);
+      const hasImageKeyword = /(image|photo|picture)/i.test(pastedText);
+
+      console.log('[PASTE] Has image extension:', hasImageExtension);
+      console.log('[PASTE] Has image keyword:', hasImageKeyword);
+
+      if (hasImageExtension || hasImageKeyword) {
+        console.log('[PASTE] Converting to markdown image format');
+        e.preventDefault(); // Prevent default paste
+
+        // Get cursor position
+        const textarea = e.currentTarget;
+        const cursorPos = textarea.selectionStart || 0;
+        console.log('[PASTE] Cursor position:', cursorPos);
+
+        // Get text before and after cursor
+        const textBefore = textarea.value.substring(0, cursorPos);
+        const textAfter = textarea.value.substring(cursorPos);
+
+        // Convert to markdown image format
+        const markdownImage = `![](${pastedText.trim()})`;
+        console.log('[PASTE] Generated markdown:', markdownImage);
+
+        // Create new content
+        const newContent = textBefore + markdownImage + textAfter;
+
+        // Update the state
+        setMarkdownContent(newContent);
+
+        // Move cursor after the inserted text
+        setTimeout(() => {
+          textarea.selectionStart = cursorPos + markdownImage.length;
+          textarea.selectionEnd = cursorPos + markdownImage.length;
+        }, 0);
+
+        // Show confirmation
+        toast.success("URL converted to markdown image format");
+      }
+    }
+  };
+
+  // Right Panel - Content Editor (updated version)
+  const renderContentEditor = () => {
+    if (!selectedNode || !selectedNode.testIds) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+          <p className="text-muted-foreground">
+            Select a test from the left panel to edit its content
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-center">
+            <CardTitle>{selectedNode.name}</CardTitle>
+            <div className="flex space-x-2 mt-4">
+              {COMPLEXITY_LEVELS.map(level => (
+                <Button
+                  key={level.name}
+                  variant={selectedComplexity === level.name ? "default" : "outline"}
+                  onClick={() => handleComplexityChange(level.name)}
+                  className="flex-1"
+                >
+                  {level.name}
+                  <span className="text-xs ml-1 opacity-80">{level.time}m</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="w-full">
+              <TabsTrigger value="questions" className="flex-1">Questions</TabsTrigger>
+              <TabsTrigger value="preview" className="flex-1">Preview</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="questions" className="p-4">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1 text-xs">
+                      <span className={markdownContent.length > MAX_CHARS ? "text-red-500 font-medium" : "text-muted-foreground"}>
+                        {markdownContent.length}/{MAX_CHARS}
+                      </span>
+                      <span className="text-muted-foreground">chars</span>
+                    </div>
+
+                    <div className="flex items-center space-x-1 text-xs">
+                      <span className={markdownContent.split('---').filter(q => q.trim()).length > MAX_QUESTIONS ? "text-red-500 font-medium" : "text-muted-foreground"}>
+                        {markdownContent.split('---').filter(q => q.trim()).length}/{MAX_QUESTIONS}
+                      </span>
+                      <span className="text-muted-foreground">questions</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <Textarea
+                  value={markdownContent}
+                  onChange={(e) => setMarkdownContent(e.target.value)}
+                  onPaste={handlePaste}
+                  placeholder="# Question 1&#10;&#10;Your question content here&#10;&#10;---&#10;&#10;# Question 2"
+                  className="font-mono min-h-[400px]"
+                />
+                
+                <div className="text-xs text-muted-foreground">
+                  Use --- to separate questions. Images must be from trusted domains ({TRUSTED_DOMAINS.join(', ')}).
+                </div>
+                
+                {/* Validation in progress */}
+                {isValidating && (
+                  <div className="space-y-2 mt-4">
+                    <div className="flex justify-between items-center text-xs text-muted-foreground">
+                      <span>Validating content...</span>
+                      <span>{showValidationProgress}%</span>
+                    </div>
+                    <Progress value={showValidationProgress} className="h-1" />
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="preview" className="p-0">
+              <div className="h-[500px] overflow-hidden">
+                {previewJson && previewJson.questions && previewJson.questions.length > 0 ? (
+                  <div className="flex flex-col h-full">
+                    <div className="p-3 border-b flex justify-between items-center">
+                      <span className="text-sm font-medium">
+                        Question {currentQuestionIndex + 1} of {previewJson.questions.length}
+                      </span>
+                      <span className="text-sm">
+                        <Clock className="h-4 w-4 inline mr-1" />
+                        {timeLimit / 60} minutes
+                      </span>
+                    </div>
+                    
+                    <div
+                      key={currentQuestionIndex}
+                      className="flex-grow overflow-auto p-4"
+                    >
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: DOMPurify.sanitize(marked.parse(previewJson.questions[currentQuestionIndex]?.question || "", { async: false }))
+                        }}
+                        className="prose prose-sm max-w-none dark:prose-invert"
+                      />
+                    </div>
+                    
+                    <div className="p-3 border-t flex justify-between">
+                      <Button
+                        onClick={handlePreviousQuestion}
+                        disabled={currentQuestionIndex === 0}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <ChevronRight className="h-4 w-4 mr-1 rotate-180" />
+                        Previous
+                      </Button>
+                      <Button
+                        onClick={handleNextQuestion}
+                        disabled={currentQuestionIndex === previewJson.questions.length - 1}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                    <div className="mb-4">
+                      <RefreshCw className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                      <h3 className="text-lg font-medium">No Preview Available</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground max-w-md">
+                      Write your questions and click "Preview" to see how they will appear.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </>
+    );
   };
 
   // Add conditional rendering based on view
@@ -1225,125 +1414,7 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
 
         {/* Right Panel - Content Editor */}
         <Card className="lg:col-span-2">
-          {selectedNode && selectedNode.testIds ? (
-            <>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-center">
-                  <CardTitle>{selectedNode.name}</CardTitle>
-                  <div className="flex space-x-2 mt-4">
-                    {COMPLEXITY_LEVELS.map(level => (
-                      <Button
-                        key={level.name}
-                        variant={selectedComplexity === level.name ? "default" : "outline"}
-                        onClick={() => handleComplexityChange(level.name)}
-                        className="flex-1"
-                      >
-                        {level.name}
-                        <span className="text-xs ml-1 opacity-80">{level.time}m</span>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="w-full">
-                    <TabsTrigger value="questions" className="flex-1">Questions</TabsTrigger>
-                    <TabsTrigger value="preview" className="flex-1">Preview</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="questions" className="p-4">
-                    <div className="space-y-4">
-                      <Textarea
-                        value={markdownContent}
-                        onChange={(e) => setMarkdownContent(e.target.value)}
-                        placeholder="# Question 1&#10;&#10;Your question content here&#10;&#10;---&#10;&#10;# Question 2"
-                        className="font-mono min-h-[400px]"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{markdownContent.length}/{MAX_CHARS} characters</span>
-                        <span>{markdownContent.split('---').filter(q => q.trim()).length}/{MAX_QUESTIONS} questions</span>
-                      </div>
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="preview" className="p-0">
-                    <div className="h-[500px] overflow-hidden">
-                      {previewJson && previewJson.questions.length > 0 ? (
-                        <div className="flex flex-col h-full">
-                          <div className="p-3 border-b flex justify-between items-center">
-                            <span className="text-sm font-medium">
-                              Question {currentQuestionIndex + 1} of {previewJson.questions.length}
-                            </span>
-                            <span className="text-sm">
-                              <Clock className="h-4 w-4 inline mr-1" />
-                              {timeLimit / 60} minutes
-                            </span>
-                          </div>
-                          
-                          <AnimatePresence mode="wait">
-                            <motion.div
-                              key={currentQuestionIndex}
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -10 }}
-                              transition={{ duration: 0.2 }}
-                              className="flex-grow overflow-auto p-4"
-                            >
-                              <div
-                                dangerouslySetInnerHTML={{
-                                  __html: DOMPurify.sanitize(marked.parse(previewJson.questions[currentQuestionIndex]?.question || "", { async: false }))
-                                }}
-                                className="prose prose-sm max-w-none dark:prose-invert"
-                              />
-                            </motion.div>
-                          </AnimatePresence>
-                          
-                          <div className="p-3 border-t flex justify-between">
-                            <Button
-                              onClick={handlePreviousQuestion}
-                              disabled={currentQuestionIndex === 0}
-                              variant="outline"
-                              size="sm"
-                            >
-                              <ChevronRight className="h-4 w-4 mr-1 rotate-180" />
-                              Previous
-                            </Button>
-                            <Button
-                              onClick={handleNextQuestion}
-                              disabled={currentQuestionIndex === previewJson.questions.length - 1}
-                              variant="outline"
-                              size="sm"
-                            >
-                              Next
-                              <ChevronRight className="h-4 w-4 ml-1" />
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-center p-6">
-                          <div className="mb-4">
-                            <RefreshCw className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-                            <h3 className="text-lg font-medium">No Preview Available</h3>
-                          </div>
-                          <p className="text-sm text-muted-foreground max-w-md">
-                            Write your questions and click "Preview" to see how they will appear.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center p-6">
-              <p className="text-muted-foreground">
-                Select a test from the left panel to edit its content
-              </p>
-            </div>
-          )}
-
+          {renderContentEditor()}
           <div className="flex justify-end space-x-2 p-4 border-t">
             <Button 
               onClick={handleSaveContent}
@@ -1465,62 +1536,83 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
                 </li>
               ))}
             </ul>
-
-            {/* Broken Images Section */}
-            {validationErrors.some(e => e.type === 'broken_image') && (
-              <div className="mt-4">
-                <h3 className="font-medium mb-2">Image Issues</h3>
-                <ul className="space-y-3">
-                  {validationErrors
-                    .filter(e => e.type === 'broken_image')
-                    .map((error, i) => {
-                      const actualUrl = error.message.split(': ')[1].split(' (')[0];
-                      const errorType = error.message.includes('(') 
-                        ? error.message.split('(')[1].replace(')', '') 
-                        : '';
-
-                      return (
-                        <li key={i} className="flex items-start text-xs">
-                          <div className="flex-1">
-                            <div className="mb-1 break-all">
-                              <span>{error.message}</span>
-                            </div>
-                            <div className="mt-1 flex space-x-2">
-                              <Input
-                                placeholder="New URL"
-                                className="h-6 text-xs"
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    handleUrlReplacement(actualUrl, e.currentTarget.value, e.currentTarget);
-                                  }
-                                }}
-                              />
-                              <Button
-                                size="sm"
-                                className="h-6 text-xs"
-                                onClick={(evt) => {
-                                  const input = evt.currentTarget.previousElementSibling as HTMLInputElement;
-                                  if (input.value) {
-                                    handleUrlReplacement(actualUrl, input.value, input);
-                                  } else {
-                                    toast.error("Please enter a replacement URL");
-                                  }
-                                }}
-                              >
-                                Replace
-                              </Button>
-                            </div>
-                          </div>
-                        </li>
-                      );
-                  })}
-                </ul>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button onClick={() => setShowValidationDialog(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Fix Dialog */}
+      <Dialog open={showImageFixDialog} onOpenChange={setShowImageFixDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Fix Image Issues</DialogTitle>
+            <DialogDescription>
+              The following images need to be fixed before saving:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 max-h-[60vh] overflow-auto">
+            <Alert variant="destructive" className="mb-4">
+              <ImageOff className="h-4 w-4" />
+              <AlertTitle>Image Issues ({brokenImages.length})</AlertTitle>
+              <AlertDescription>
+                <p className="mb-2">Images must be from trusted domains: {TRUSTED_DOMAINS.join(', ')}</p>
+                <ul className="mt-2 text-sm space-y-3">
+                  {brokenImages.map((url, i) => {
+                    const actualUrl = url.split(' ')[0]; // Extract just the URL part
+                    const errorType = url.includes('(') ? url.split('(')[1].replace(')', '') : '';
+
+                    return (
+                      <li key={i} className="flex items-start text-xs">
+                        <div className="flex-1">
+                          <div className="mb-1 break-all">
+                            <span>{url}</span>
+                          </div>
+                          <div className="mt-1 flex space-x-2">
+                            <Input
+                              placeholder="New URL"
+                              className="h-8 text-xs"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleUrlReplacement(actualUrl, e.currentTarget.value, e.currentTarget);
+                                }
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              className="h-8"
+                              onClick={(evt) => {
+                                const input = evt.currentTarget.previousElementSibling as HTMLInputElement;
+                                if (input.value) {
+                                  handleUrlReplacement(actualUrl, input.value, input);
+                                } else {
+                                  toast.error("Please enter a replacement URL");
+                                }
+                              }}
+                            >
+                              Replace
+                            </Button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImageFixDialog(false)}>
+              Close
+            </Button>
+            <Button 
+              onClick={handleSaveContent}
+              disabled={brokenImages.length > 0}
+            >
+              {brokenImages.length > 0 ? "Fix All Images First" : "Save Anyway"}
             </Button>
           </DialogFooter>
         </DialogContent>
