@@ -38,7 +38,7 @@ export default function Header() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <Link href="/coupons" className="w-full">
+                <Link href="/cards" className="w-full">
                   Generate Interview Cards
                 </Link>
               </DropdownMenuItem>

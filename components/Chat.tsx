@@ -20,15 +20,20 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 
-import { 
-  getNode, 
-  getOptionText, 
-  getQuestionSetId, 
-  chatbotFlow, 
-  type ChatbotNode 
+import { supabase } from '@/lib/supabase';
+
+import {
+  getNode,
+  getOptionText,
+  getQuestionSetId,
+  chatbotFlow,
+  type ChatbotNode,
+  companyRegistry // Import the registry object instead of the JSON
 } from "@/utils/chatbotFlow"
 
-import companyRegistry from "../config/company-registry.json";
+import { createClient } from '@supabase/supabase-js';
+
+
 
 interface ChatMessage {
   role: "ai" | "user";
@@ -44,6 +49,8 @@ interface ChatProps {
   onSendMessage: (message: string) => void;
   onGenerateImage: (prompt: string, questionSetId: string | undefined, complexity: string, category: string) => Promise<string>;
 }
+
+
 
 const COMPLEXITY_MINUTES = {
   Easy: 15,
@@ -174,10 +181,10 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
 
   // Create refs outside of useEffect but inside component
   const mounted = useRef(true);
-  
+
   // IMPORTANT: Debug log to check if component is mounted
   console.log("📢 Chat component is mounting");
-  
+
   // IMPORTANT: Automatically set ready state after 5 seconds (failsafe)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -186,20 +193,37 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
         setIsFlowReady(true);
       }
     }, 5000);
-    
+
     return () => clearTimeout(timeoutId);
   }, [isFlowReady]);
 
   useEffect(() => {
     console.log("🎧 Setting up event listeners for flow");
     
+    // This variable tracks if validation has been performed
+    let validationDone = false;
+  
     // Listen for when company flow is ready
     const handleFlowReady = (event: Event) => {
       console.log("✅ Received company-flow-ready event");
-      setIsFlowReady(true);
+      
+      // Only validate once
+      if (!validationDone) {
+        validationDone = true;
+        
+        // Now that registry is loaded, check the company ID
+        const companyId = getCompanyIdFromUrl();
+        if (companyId && !(companyRegistry?.companies && companyId in companyRegistry.companies)) {
+          console.log(`❌ Invalid company ID after flow ready: "${companyId}"`);
+          setFlowError(`Invalid company ID: "${companyId}"`);
+        }
+        
+        // Set ready state last, after validation
+        setIsFlowReady(true);
+      }
     };
-    
-    const handleFlowError = (event: CustomEvent<{error: string}>) => {
+  
+    const handleFlowError = (event: CustomEvent<{ error: string }>) => {
       // Make sure component is still mounted
       if (mounted.current) {
         console.log("❌ Received company-flow-error event:", event.detail.error);
@@ -207,59 +231,55 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
         setIsFlowReady(true); // Remove loading screen
       }
     };
-
-    // Check for invalid company ID directly in this effect
+  
+    // Get company ID for logging only
     const companyId = getCompanyIdFromUrl();
     console.log(`🔍 Chat component checking company_id: "${companyId}"`);
-    
+  
     if (typeof window !== 'undefined') {
       window.addEventListener('company-flow-ready', handleFlowReady);
       window.addEventListener('company-flow-error', handleFlowError as EventListener);
-      
-      if (companyId && !(companyRegistry?.companies && companyId in companyRegistry.companies)) {
-        console.log(`❌ Invalid company ID in Chat component: "${companyId}"`);
-        setFlowError(`Invalid company ID: "${companyId}"`);
-        setIsFlowReady(true);
-      } else if (!companyId) {
+  
+      // REMOVE validation logic here
+      // ONLY handle the no companyId case which doesn't need registry
+      if (!companyId) {
         console.log("ℹ️ No company ID, proceeding with default flow");
         // This case should be handled by the event, but as a fallback:
         // Check if chatbotFlow is already initialized
         if (chatbotFlow && chatbotFlow.nodes && chatbotFlow.nodes.root) {
           console.log("✅ Default flow already initialized, setting ready");
           setIsFlowReady(true);
+          validationDone = true;
         }
       } else {
-        console.log(`✓ Valid company ID found: "${companyId}", waiting for flow ready event`);
-        // If we have a valid company ID, we'll manually trigger a check after a short delay
-        // just to handle any potential race conditions
-        setTimeout(() => {
-          if (!isFlowReady && mounted.current) {
-            console.log("⏱️ Checking flow status after delay...");
-            // Check if chatbotFlow has been populated with company-specific data
-            if (chatbotFlow && chatbotFlow.metadata?.company === companyRegistry.companies[companyId as keyof typeof companyRegistry.companies]?.name) {
-              console.log("✅ Company flow already loaded, setting ready state");
-              setIsFlowReady(true);
-            }
-          }
-        }, 1000);
+        console.log(`✓ Company ID found: "${companyId}", waiting for flow ready event`);
       }
+      
+      // Add a timeout as fallback
+      const timeoutId = setTimeout(() => {
+        if (!validationDone) {
+          console.log("⚠️ Flow ready event timeout - proceeding anyway");
+          handleFlowReady(new Event('timeout'));
+        }
+      }, 5000);
+      
+      return () => {
+        console.log("🧹 Cleaning up event listeners");
+        mounted.current = false;
+        window.removeEventListener('company-flow-ready', handleFlowReady);
+        window.removeEventListener('company-flow-error', handleFlowError as EventListener);
+        clearTimeout(timeoutId);
+      };
     } else {
       // Set flow ready even in SSR to avoid blocking
       console.log("🖥️ In SSR environment, setting flow ready");
       setIsFlowReady(true);
+      return () => {
+        mounted.current = false;
+      };
     }
-    
-    return () => {
-      console.log("🧹 Cleaning up event listeners");
-      mounted.current = false;
-      
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('company-flow-ready', handleFlowReady);
-        window.removeEventListener('company-flow-error', handleFlowError as EventListener);
-      }
-    };
-  }, []); // No dependencies needed
-  
+  }, []);// No dependencies needed
+
   useEffect(() => {
     scrollToBottom()
   }, [chatHistory, displayedTextMap])
@@ -521,192 +541,192 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
 
   return (
     <div className="flex flex-col h-full bg-background">
-    {!isFlowReady ? (
-      <div className="flex items-center justify-center h-full">
-        <div className="space-y-3">
-          <div className="flex space-x-2 items-center">
-            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
-            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
-            <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
-            <span className="text-sm text-gray-500 ml-2">Loading chat interface...</span>
+      {!isFlowReady ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="space-y-3">
+            <div className="flex space-x-2 items-center">
+              <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></div>
+              <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></div>
+              <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></div>
+              <span className="text-sm text-gray-500 ml-2">Loading interviews for you...</span>
+            </div>
           </div>
         </div>
-      </div>
-    ) : flowError ? (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center p-6 max-w-md">
-          <div className="text-red-500 text-4xl mb-4">⚠️</div>
-          <h3 className="text-lg font-medium text-red-800 mb-2">Error Loading Chat</h3>
-          <p className="text-gray-600 mb-4">{flowError}</p>
-          <p className="text-sm text-gray-500">
-            Please check the company ID in your URL or contact support for assistance.
-          </p>
+      ) : flowError ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center p-6 max-w-md">
+            <div className="text-red-500 text-4xl mb-4">⚠️</div>
+            <h3 className="text-lg font-medium text-red-800 mb-2">Error Loading Chat</h3>
+            <p className="text-gray-600 mb-4">{flowError}</p>
+            <p className="text-sm text-gray-500">
+              Please check the company ID in your URL or contact support for assistance.
+            </p>
+          </div>
         </div>
-      </div>
-    ) : (
-      <>
-      <div className="py-3 px-4 border-b">
-        <Alert className="border-primary/20 bg-primary/5">
-          <Clock className="h-4 w-4 text-primary" />
-          <AlertTitle className="text-sm font-medium">Time Remaining: {formatMinutes(remainingMinutes)}</AlertTitle>
-        </Alert>
-      </div>
-      <ScrollArea className="flex-1 px-4 py-3">
-        <AnimatePresence initial={false} mode="sync">
-          {chatHistory.map((msg, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, height: 0, marginBottom: 0, overflow: "hidden" }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} mb-5`}
-            >
-              <div className={`flex items-start max-w-[80%] ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                <Avatar className={`w-8 h-8 ${msg.role === "user" ? "ml-3" : "mr-3"} flex-shrink-0`}>
-                  <AvatarFallback className={msg.role === "user" ? "bg-primary" : "bg-muted"}>
-                    {msg.role === "ai" ? <Bot className="w-4 h-4 text-foreground/80" /> : <User className="w-4 h-4 text-primary-foreground" />}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div
-                  className={`p-3 rounded-lg ${msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground"
-                    }`}
+      ) : (
+        <>
+          <div className="py-3 px-4 border-b">
+            <Alert className="border-primary/20 bg-primary/5">
+              <Clock className="h-4 w-4 text-primary" />
+              <AlertTitle className="text-sm font-medium">Time Remaining: {formatMinutes(remainingMinutes)}</AlertTitle>
+            </Alert>
+          </div>
+          <ScrollArea className="flex-1 px-4 py-3">
+            <AnimatePresence initial={false} mode="sync">
+              {chatHistory.map((msg, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0, marginBottom: 0, overflow: "hidden" }}
+                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} mb-5`}
                 >
-                  <p className="text-sm">
-                    {msg.role === "ai" ? (
-                      <TypingEffect
-                        text={msg.content}
-                        messageIndex={index}
-                        onComplete={handleTypingComplete}
-                      />
-                    ) : (
-                      msg.content
-                    )}
-                  </p>
+                  <div className={`flex items-start max-w-[80%] ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+                    <Avatar className={`w-8 h-8 ${msg.role === "user" ? "ml-3" : "mr-3"} flex-shrink-0`}>
+                      <AvatarFallback className={msg.role === "user" ? "bg-primary" : "bg-muted"}>
+                        {msg.role === "ai" ? <Bot className="w-4 h-4 text-foreground/80" /> : <User className="w-4 h-4 text-primary-foreground" />}
+                      </AvatarFallback>
+                    </Avatar>
 
-                  {msg.options && (
-                    <>
-                      {/* For AI messages, only show options after typing completes */}
-                      {msg.role === "ai" ? (
-                        displayedTextMap[index] === msg.content && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="mt-3 space-y-2"
-                          >
-                            {/* Options buttons */}
-                            {renderOptions(msg.options)}
-                          </motion.div>
-                        )
-                      ) : (
-                        /* For user messages, always show options */
-                        <div className="mt-3 space-y-2">
-                          {/* Options buttons */}
-                          {renderOptions(msg.options)}
-                        </div>
+                    <div
+                      className={`p-3 rounded-lg ${msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-foreground"
+                        }`}
+                    >
+                      <p className="text-sm">
+                        {msg.role === "ai" ? (
+                          <TypingEffect
+                            text={msg.content}
+                            messageIndex={index}
+                            onComplete={handleTypingComplete}
+                          />
+                        ) : (
+                          msg.content
+                        )}
+                      </p>
+
+                      {msg.options && (
+                        <>
+                          {/* For AI messages, only show options after typing completes */}
+                          {msg.role === "ai" ? (
+                            displayedTextMap[index] === msg.content && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.3 }}
+                                className="mt-3 space-y-2"
+                              >
+                                {/* Options buttons */}
+                                {renderOptions(msg.options)}
+                              </motion.div>
+                            )
+                          ) : (
+                            /* For user messages, always show options */
+                            <div className="mt-3 space-y-2">
+                              {/* Options buttons */}
+                              {renderOptions(msg.options)}
+                            </div>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                </div>
+                    </div>
 
 
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-        {isAiThinking && (
-          <div className="flex justify-start mb-4">
-            <div className="flex items-start">
-              <Avatar className="w-8 h-8 mr-3 flex-shrink-0">
-                <AvatarFallback className="bg-muted">
-                  <Bot className="w-4 h-4 text-foreground/80" />
-                </AvatarFallback>
-              </Avatar>
-              <Card className="p-2 bg-muted border-none shadow-none">
-                <CardContent className="p-2">
-                  <ThinkingAnimation />
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-        <div ref={chatEndRef} />
-      </ScrollArea>
-
-      <AlertDialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <AlertDialogContent className="sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Interview Generation</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-4">
-              <div className="border rounded-lg p-4 bg-muted/50">
-                <p className="font-medium mb-2 text-sm">Selected Interview Details:</p>
-                <div className="space-y-2 text-sm">
-                  <p><span className="text-muted-foreground">Category:</span> {currentNode.text}</p>
-                  <p><span className="text-muted-foreground">Complexity:</span> {pendingComplexity}</p>
-                  <p><span className="text-muted-foreground">Duration:</span> {COMPLEXITY_MINUTES[pendingComplexity as keyof typeof COMPLEXITY_MINUTES]} minutes</p>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            {isAiThinking && (
+              <div className="flex justify-start mb-4">
+                <div className="flex items-start">
+                  <Avatar className="w-8 h-8 mr-3 flex-shrink-0">
+                    <AvatarFallback className="bg-muted">
+                      <Bot className="w-4 h-4 text-foreground/80" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <Card className="p-2 bg-muted border-none shadow-none">
+                    <CardContent className="p-2">
+                      <ThinkingAnimation />
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
-              <div className="flex gap-2 items-start p-3 bg-amber-50 rounded-md border border-amber-200">
-                <Clock className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                <p className="text-amber-800 text-sm">
-                  This action will deduct {COMPLEXITY_MINUTES[pendingComplexity as keyof typeof COMPLEXITY_MINUTES]} minutes
-                  from your remaining time and cannot be reversed.
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-4">
-            <AlertDialogCancel onClick={() => handleConfirmation(false)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => handleConfirmation(true)}
-              className="bg-primary hover:bg-primary/90"
-            >
-              Generate Interview
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            )}
+            <div ref={chatEndRef} />
+          </ScrollArea>
 
-      <AlertDialog open={showPrepaidCodeDialog} onOpenChange={setShowPrepaidCodeDialog}>
-        <AlertDialogContent className="sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Enter Prepaid Code</AlertDialogTitle>
-            <AlertDialogDescription>
-              Please enter your prepaid code to add more minutes.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="prepaid-code" className="text-right text-sm">
-                Code
-              </Label>
-              <Input
-                id="prepaid-code"
-                value={prepaidCode}
-                onChange={(e) => setPrepaidCode(e.target.value)}
-                className="col-span-3"
-                placeholder="Enter your code"
-              />
-            </div>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowPrepaidCodeDialog(false)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handlePrepaidCodeSubmit}>
-              Submit
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      </>
-    )}
+          <AlertDialog open={showConfirmation} onOpenChange={setShowConfirmation}>
+            <AlertDialogContent className="sm:max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Interview Generation</AlertDialogTitle>
+                <AlertDialogDescription className="space-y-4">
+                  <div className="border rounded-lg p-4 bg-muted/50">
+                    <p className="font-medium mb-2 text-sm">Selected Interview Details:</p>
+                    <div className="space-y-2 text-sm">
+                      <p><span className="text-muted-foreground">Category:</span> {currentNode.text}</p>
+                      <p><span className="text-muted-foreground">Complexity:</span> {pendingComplexity}</p>
+                      <p><span className="text-muted-foreground">Duration:</span> {COMPLEXITY_MINUTES[pendingComplexity as keyof typeof COMPLEXITY_MINUTES]} minutes</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 items-start p-3 bg-amber-50 rounded-md border border-amber-200">
+                    <Clock className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-amber-800 text-sm">
+                      This action will deduct {COMPLEXITY_MINUTES[pendingComplexity as keyof typeof COMPLEXITY_MINUTES]} minutes
+                      from your remaining time and cannot be reversed.
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="mt-4">
+                <AlertDialogCancel onClick={() => handleConfirmation(false)}>
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => handleConfirmation(true)}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  Generate Interview
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog open={showPrepaidCodeDialog} onOpenChange={setShowPrepaidCodeDialog}>
+            <AlertDialogContent className="sm:max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Enter Prepaid Code</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Please enter your prepaid code to add more minutes.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="prepaid-code" className="text-right text-sm">
+                    Code
+                  </Label>
+                  <Input
+                    id="prepaid-code"
+                    value={prepaidCode}
+                    onChange={(e) => setPrepaidCode(e.target.value)}
+                    className="col-span-3"
+                    placeholder="Enter your code"
+                  />
+                </div>
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShowPrepaidCodeDialog(false)}>
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction onClick={handlePrepaidCodeSubmit}>
+                  Submit
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </div>
   )
 }

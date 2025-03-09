@@ -14,6 +14,11 @@ fi
 # Remove previous build
 rm -rf out
 
+# Set environment variables for the build process
+export NEXT_PUBLIC_SUPABASE_URL="https://xwrjwvspbayowtwbrbcd.supabase.co"
+export NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cmp3dnNwYmF5b3d0d2JyYmNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEzNDQ4OTksImV4cCI6MjA1NjkyMDg5OX0.mrgp3CeKu8eeoC0tRN_y-XpFgklVltYBqQYjY4HSIhQ"
+
+
 # Build the project using npm
 npm run build || { echo "Build failed"; exit 1; }
 

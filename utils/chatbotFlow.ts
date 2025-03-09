@@ -1,28 +1,45 @@
-import defaultChatbotFlowData from "../chatbot-flow.json"
-import companyRegistry from "../config/company-registry.json"
+import { createClient } from '@supabase/supabase-js';
+import defaultChatbotFlowData from "../chatbot-flow.json";
+
+import { supabase, supabaseUrl } from '@/lib/supabase';
 
 console.log('🔄 chatbotFlow.ts module loading');
 
-// Type definition for company registry
-interface CompanyData {
-  name: string
-  jsonFile: string
-  logo: string
+
+// Storage bucket name
+const STORAGE_BUCKET = "chatbot-flows";
+
+// Flags to control fetching behavior
+const SKIP_CHATFLOW_METADATA_CHECK = true;
+const SKIP_COMPANY_REGISTRY_METADATA_CHECK = true;
+
+// Export these types for use in other components
+export interface CompanyData {
+  id: string;
+  name: string;
+  json_file: string;
+  logo: string;
+  updated_at: string;
 }
 
-interface CompanyRegistry {
+export interface CompanyRegistry {
   companies: {
-    [companyId: string]: CompanyData
-  }
-  default: string
+    [companyId: string]: {
+      name: string;
+      jsonFile: string;
+      logo: string;
+    }
+  };
+  default: string;
+  lastUpdated?: string;
 }
 
 export interface ChatbotNode {
-  question: string
-  options?: string[]
-  text?: string
-  parent?: string
-  isEndpoint?: boolean
+  question: string;
+  options?: string[];
+  text?: string;
+  parent?: string;
+  isEndpoint?: boolean;
   questionSetId?: {
     [key: string]: {
       standard: {
@@ -33,21 +50,21 @@ export interface ChatbotNode {
 }
 
 export interface ChatbotOption {
-  text: string
+  text: string;
 }
 
 export interface Metadata {
-  version?: string
-  lastUpdated?: string
-  company?: string
-  description?: string
-  defaultLanguage?: string
+  version?: string;
+  lastUpdated?: string;
+  company?: string;
+  description?: string;
+  defaultLanguage?: string;
 }
 
 export interface ChatbotFlow {
-  metadata?: Metadata
-  nodes: { [key: string]: ChatbotNode }
-  options: { [key: string]: ChatbotOption }
+  metadata?: Metadata;
+  nodes: { [key: string]: ChatbotNode };
+  options: { [key: string]: ChatbotOption };
 }
 
 /**
@@ -56,16 +73,123 @@ export interface ChatbotFlow {
  */
 export function getCompanyIdFromUrl(): string | null {
   if (typeof window !== 'undefined') {
-    const params = new URLSearchParams(window.location.search)
+    const params = new URLSearchParams(window.location.search);
     const companyId = params.get('company_id');
     console.log(`🔍 Getting company_id from URL: "${companyId}"`);
     return companyId;
   }
-  return null
+  return null;
 }
 
+// Cache for company registry
+let companyRegistryCache: CompanyRegistry | null = null;
+
+// Export the registry itself for use in other components
+export let companyRegistry: CompanyRegistry = {
+  companies: {},
+  default: 'chatbot-flow.json'
+};
+
 // Cache to store loaded flows
-const flowCache: Record<string, ChatbotFlow> = {}
+const flowCache: Record<string, ChatbotFlow> = {};
+
+/**
+ * Loads the company registry from Supabase or local storage
+ */
+export async function loadCompanyRegistry(): Promise<CompanyRegistry> {
+  // Check localStorage first if we're in a browser environment
+  if (typeof window !== 'undefined') {
+    const cachedDataString = localStorage.getItem('company-registry-data');
+
+    if (cachedDataString) {
+      try {
+        console.log(`Found cached company registry`);
+        const cachedData = JSON.parse(cachedDataString);
+
+        // If skip flag is true, use cached data without checking for updates
+        if (SKIP_COMPANY_REGISTRY_METADATA_CHECK) {
+          console.log(`⚡ Using cached company registry (skipping metadata check)`);
+          companyRegistry = cachedData;
+          return cachedData;
+        }
+
+        // Check if we should fetch updated data
+        if (cachedData.lastUpdated) {
+          const cachedLastUpdated = new Date(cachedData.lastUpdated).getTime();
+          // TODO: Add logic to check if data is fresh
+          // For now, just use the cached data if it exists
+          companyRegistry = cachedData;
+          return cachedData;
+        }
+      } catch (e) {
+        console.warn(`Error parsing cached company registry:`, e);
+      }
+    }
+  }
+
+  // If we reach here, we need to fetch from Supabase
+  try {
+    console.log('📥 Fetching company registry from Supabase');
+
+    const { data, error } = await supabase
+      .from('companies')
+      .select('id, name, json_file, logo, updated_at')
+      .order('name');
+
+    console.log("READ COMPANIES TABLE FROM SUPABASE")
+
+    if (error) {
+      throw new Error(`Error fetching company registry: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error('No companies found in registry');
+    }
+
+    // Transform data to expected format
+    const registry: CompanyRegistry = {
+      companies: {},
+      default: 'chatbot-flow.json',
+      lastUpdated: new Date().toISOString()
+    };
+
+    data.forEach((company: CompanyData) => {
+      registry.companies[company.id] = {
+        name: company.name,
+        jsonFile: company.json_file,
+        logo: company.logo
+      };
+    });
+
+    // Store in memory cache and localStorage
+    companyRegistryCache = registry;
+    companyRegistry = registry;
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('company-registry-data', JSON.stringify(registry));
+      console.log('💾 Stored company registry in localStorage');
+    }
+
+    return registry;
+  } catch (error) {
+    console.error('Error loading company registry:', error);
+
+    // Return a minimal registry if needed for fallback
+    const fallbackRegistry = {
+      companies: {
+        default: {
+          name: 'Default',
+          jsonFile: 'chatbot-flow.json',
+          logo: 'default-logo.svg'
+        }
+      },
+      default: 'chatbot-flow.json'
+    };
+
+    companyRegistry = fallbackRegistry;
+    return fallbackRegistry;
+  }
+}
 
 /**
  * Extracts metadata from a partial JSON string using regex
@@ -76,7 +200,7 @@ function extractMetadata(partialJson: string): Metadata | null {
   try {
     // Look for metadata object at the beginning of the JSON
     const metadataMatch = partialJson.match(/"metadata"\s*:\s*({[^}]+})/);
-    
+
     if (metadataMatch && metadataMatch[1]) {
       // Create a properly formed JSON object
       const validJson = `{"metadata":${metadataMatch[1]}}`;
@@ -96,29 +220,36 @@ function extractMetadata(partialJson: string): Metadata | null {
  * @returns The extracted metadata or null if failed
  */
 async function fetchMetadataFromFile(filename: string): Promise<Metadata | null> {
+  // For partial file reading with range header
+  console.log(`Fetching metadata from ${filename}`);
+
   try {
-    console.log(`Fetching metadata from ${filename}`);
-    
-    // In a production environment, we'd use Range headers
-    // For local development with imports, we'll simulate by reading the whole file
-    // and then only processing the first part
-    let module;
-    
-    // Conditional import based on filename
-    if (filename.includes('ibm')) {
-      module = await import('../chatbot-flow-ibm.json');
-    } else if (filename.includes('cisco')) {
-      module = await import('../chatbot-flow-cisco.json');
-    } else {
-      return null;
+    // Create a signed URL for the file
+    const { data: signedURLData, error: signedURLError } = await supabase
+      .storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(filename, 60); // URL valid for 60 seconds
+
+    if (signedURLError) {
+      console.error('Signed URL error details:', signedURLError);
+      throw new Error(`Failed to create signed URL: ${signedURLError.message}`);
     }
-    
-    // Convert to string to simulate partial read
-    const fullJson = JSON.stringify(module.default);
-    const partialJson = fullJson.substring(0, 200); // Simulate reading only first 500 bytes
-    
-    console.log('Partial JSON (first 500 bytes):', partialJson);
-    
+
+    // Use the signed URL with a range header
+    const response = await fetch(signedURLData.signedUrl, {
+      headers: {
+        'Range': 'bytes=0-200' // First 200 bytes for metadata
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch metadata: ${response.status} ${response.statusText}`);
+    }
+
+    // Get the partial JSON text
+    const partialJson = await response.text();
+    console.log('Partial JSON (first 200 bytes):', partialJson);
+
     // Extract metadata from partial JSON
     const metadata = extractMetadata(partialJson);
     console.log('Extracted metadata:', metadata);
@@ -141,44 +272,51 @@ export async function loadChatbotFlow(companyId: string | null): Promise<Chatbot
     console.log('Using default chatbot flow');
     return defaultChatbotFlowData as ChatbotFlow;
   }
-  
+
   console.log(`Loading flow for company ID: ${companyId}`);
-  
+
   // Check if the company ID exists in the registry
   if (companyRegistry.companies && companyId in companyRegistry.companies) {
-    const companyData = companyRegistry.companies[companyId as keyof typeof companyRegistry.companies];
+    const companyData = companyRegistry.companies[companyId];
     console.log(`Found company in registry: ${companyId} (${companyData.name})`);
-    
+
     try {
       // Check localStorage first if we're in a browser environment
       if (typeof window !== 'undefined') {
         const cachedDataString = localStorage.getItem(`${companyId}-flow-data`);
-        
+
         if (cachedDataString) {
           try {
             console.log(`Found cached data for ${companyId}`);
             const cachedData = JSON.parse(cachedDataString);
+
+            // If SKIP flag is true, use cached data without checking for updates
+            if (SKIP_CHATFLOW_METADATA_CHECK) {
+              console.log(`⚡ Using cached flow for company: ${companyId} (skipping metadata check)`);
+              return cachedData.data;
+            }
+
             const cachedMetadata = cachedData.metadata;
-            
+
             // Check if we have lastUpdated before trying to parse it
             if (cachedMetadata?.lastUpdated) {
               const cachedLastUpdated = new Date(cachedMetadata.lastUpdated).getTime();
-              
+
               console.log(`Cached data timestamp: ${cachedMetadata.lastUpdated}`);
-              
+
               // Fetch just the metadata to check if we need to update
-              const filename = companyData.jsonFile;
-              const currentMetadata = await fetchMetadataFromFile(filename);
-              
+              const jsonFile = companyData.jsonFile;
+              const currentMetadata = await fetchMetadataFromFile(jsonFile);
+
               if (currentMetadata?.lastUpdated) {
                 const serverLastUpdated = new Date(currentMetadata.lastUpdated).getTime();
                 console.log(`Server data timestamp: ${currentMetadata.lastUpdated}`);
-                
+
                 if (cachedLastUpdated >= serverLastUpdated) {
                   console.log(`✅ Using cached flow for company: ${companyId} (cache is current)`);
                   return cachedData.data;
                 }
-                
+
                 console.log(`⚠️ Cache outdated for company: ${companyId}, fetching updated data`);
               }
             } else {
@@ -192,28 +330,46 @@ export async function loadChatbotFlow(companyId: string | null): Promise<Chatbot
           console.log(`No cached data found for ${companyId}`);
         }
       }
-      
+
       // If we reach here, we need to fetch fresh data
       let flowData: ChatbotFlow;
-      
+
       console.log(`📥 Fetching full flow data for company: ${companyId}`);
-      
-      // Hard-code specific imports for now, based on company ID
-      if (companyId === 'ibm') {
-        const module = await import('../chatbot-flow-ibm.json');
-        flowData = module.default as ChatbotFlow;
-      } else if (companyId === 'cisco') {
-        const module = await import('../chatbot-flow-cisco.json');
-        flowData = module.default as ChatbotFlow;
-      } else {
-        // Fallback to default if the specific JSON isn't available
-        console.warn(`No specific import available for company ${companyId}, using default`);
-        flowData = defaultChatbotFlowData as ChatbotFlow;
+
+      const jsonFile = companyData.jsonFile;
+
+      console.log(`Fetching from storage bucket: ${STORAGE_BUCKET}, file: ${jsonFile}`);
+
+      // Use the Supabase client's storage methods to download the file
+      const { data, error } = await supabase
+        .storage
+        .from(STORAGE_BUCKET)
+        .download(jsonFile);
+
+      if (error) {
+        console.error('Storage download error details:', error);
+        throw new Error(`Failed to fetch flow data: ${error.message || JSON.stringify(error)}`);
       }
-      
+
+      // Convert the downloaded data to text
+      const text = await data.text();
+
+      // Parse the JSON text
+      try {
+        flowData = JSON.parse(text) as ChatbotFlow;
+      } catch (error) {
+        // Use a different variable name to avoid redeclaration
+        // and properly handle the error type
+        const jsonError = error instanceof Error
+          ? error.message
+          : 'Unknown JSON parsing error';
+
+        throw new Error(`Failed to parse JSON data: ${jsonError}`);
+      }
+
       // Store in memory cache
       flowCache[companyId] = flowData;
-      
+
       // Also store in localStorage for persistence across sessions
       if (typeof window !== 'undefined' && flowData.metadata?.lastUpdated) {
         localStorage.setItem(`${companyId}-flow-data`, JSON.stringify({
@@ -222,7 +378,7 @@ export async function loadChatbotFlow(companyId: string | null): Promise<Chatbot
         }));
         console.log(`💾 Stored flow data in localStorage for company: ${companyId}`);
       }
-      
+
       return flowData;
     } catch (error) {
       console.error(`Error loading flow for company ${companyId}:`, error);
@@ -230,7 +386,7 @@ export async function loadChatbotFlow(companyId: string | null): Promise<Chatbot
   } else {
     console.warn(`Company ID "${companyId}" not found in registry`);
   }
-  
+
   // If company ID is not in registry or loading fails, fall back to default
   console.warn(`Using default flow (company ID "${companyId}" not found or load failed)`);
   return defaultChatbotFlowData as ChatbotFlow;
@@ -240,65 +396,63 @@ export async function loadChatbotFlow(companyId: string | null): Promise<Chatbot
 export let chatbotFlow: ChatbotFlow = defaultChatbotFlowData as ChatbotFlow;
 console.log('⚡ Initial default flow loaded synchronously');
 
+/**
+ * Initialize the chatbot flow system
+ */
+export async function initializeChatbot() {
+  try {
+    // First load the company registry
+    await loadCompanyRegistry();
+    console.log('✅ Loaded company registry');
+
+    // Then try to load company specific flow if URL has company_id
+    const companyId = getCompanyIdFromUrl();
+    if (companyId) {
+      chatbotFlow = await loadChatbotFlow(companyId);
+    }
+
+    // Dispatch event that flow is ready
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('company-flow-ready'));
+      console.log(`📣 Dispatched company-flow-ready event`);
+    }
+  } catch (error) {
+    console.error('Error initializing chatbot:', error);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('company-flow-error', {
+        detail: { error: 'Failed to initialize chatbot' }
+      }));
+    }
+  }
+}
+
 // Add a listener for DOM content loaded
 if (typeof window !== 'undefined') {
   console.log('📣 Setting up initialization for browser environment');
-  
+
   // Create a flag to track initialization state
   let isInitializing = false;
   let isInitialized = false;
-  
+
   const initializeFlow = async () => {
     if (isInitializing || isInitialized) {
       console.log('🔄 Flow initialization already in progress or completed');
       return;
     }
-    
+
     isInitializing = true;
-    const companyId = getCompanyIdFromUrl();
-    console.log(`🔍 Initialization checking for company_id in URL: "${companyId}"`);
-    
-    if (companyId) {
-      // Check if company exists in registry before trying to load
-      if (companyRegistry.companies && companyId in companyRegistry.companies) {
-        try {
-          console.log(`🔄 Loading flow for company ID: ${companyId}`);
-          const flowData = await loadChatbotFlow(companyId);
-          chatbotFlow = flowData;
-          console.log(`✅ Successfully loaded flow for company ID: ${companyId}`);
-          isInitialized = true;
-          
-          // IMPORTANT: Dispatch the company-flow-ready event
-          window.dispatchEvent(new CustomEvent('company-flow-ready'));
-          console.log(`📣 Dispatched company-flow-ready event for ${companyId}`);
-          
-        } catch (error) {
-          console.error('❌ Error initializing company flow:', error);
-          // Dispatch error event
-          window.dispatchEvent(new CustomEvent('company-flow-error', { 
-            detail: { companyId, error: 'Failed to load company flow' } 
-          }));
-        }
-      } else {
-        // Invalid company ID
-        console.error(`❌ Invalid company ID: "${companyId}" not found in registry`);
-        // Dispatch invalid company event
-        window.dispatchEvent(new CustomEvent('company-flow-error', { 
-          detail: { companyId, error: 'Invalid company ID' } 
-        }));
-      }
-    } else {
-      console.log('ℹ️ No company ID found in URL, using default flow');
-      // IMPORTANT: Dispatch the company-flow-ready event for default flow too
-      window.dispatchEvent(new CustomEvent('company-flow-ready'));
-      console.log(`📣 Dispatched company-flow-ready event for default flow`);
+
+    try {
+      await initializeChatbot();
       isInitialized = true;
+    } catch (error) {
+      console.error('Error in initializeFlow:', error);
+    } finally {
+      isInitializing = false;
     }
-    
-    isInitializing = false;
   };
 
-  // Execute initialization when DOM is fully loaded to ensure all parameters are available
+  // Execute initialization when DOM is fully loaded
   if (document.readyState === 'loading') {
     console.log('🔄 Document still loading, adding DOMContentLoaded listener');
     document.addEventListener('DOMContentLoaded', () => {
@@ -309,7 +463,7 @@ if (typeof window !== 'undefined') {
     console.log('🔄 Document already loaded, initializing flow immediately');
     initializeFlow();
   }
-  
+
   // Also listen for URL changes (for Single Page Apps)
   window.addEventListener('popstate', () => {
     console.log('🔄 URL changed, re-initializing flow');
@@ -321,11 +475,11 @@ if (typeof window !== 'undefined') {
 export function getNode(key: string): ChatbotNode {
   console.log(`🔍 Getting node with key: "${key}" from flow`);
   console.log(`🔍 Current root question: "${chatbotFlow.nodes.root.question}"`);
-  
+
   const node = chatbotFlow.nodes[key];
   if (!node) {
     console.warn(`⚠️ Node with key "${key}" not found in chatbot flow`);
-    
+
     // Check if it's an option instead
     const option = chatbotFlow.options[key];
     if (option) {
@@ -343,7 +497,7 @@ export function getNode(key: string): ChatbotNode {
       options: ["root"],
     };
   }
-  
+
   console.log(`✓ Found node with key "${key}": ${node.text || node.question}`);
   return {
     ...node,
@@ -392,7 +546,7 @@ export function getQuestionSetId(node: ChatbotNode, complexity: string): string 
       console.log('Found parent node:', parentNodeKey, parentNode);
 
       // Get the option key that matches our text
-      const optionKey = parentNode.options?.find(option => 
+      const optionKey = parentNode.options?.find(option =>
         chatbotFlow.options[option]?.text === node.text
       );
 

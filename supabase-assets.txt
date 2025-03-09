@@ -1,0 +1,65 @@
+-- Test Menu (for storing the text-based menu structure)
+CREATE TABLE test_menus (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id UUID REFERENCES companies(id),
+  menu_text TEXT NOT NULL,         -- Stores the raw text format (-Category, --Test)
+  menu_json JSONB NOT NULL,        -- Stores the parsed JSON structure
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_modified_by UUID REFERENCES users(id)
+);
+
+
+drop users
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email TEXT UNIQUE NOT NULL,
+  full_name TEXT,
+  avatar_url TEXT,
+  role TEXT NOT NULL DEFAULT 'user', -- 'admin', 'user'
+  company_id UUID REFERENCES companies(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create tests table
+CREATE TABLE tests (
+  id VARCHAR(50) PRIMARY KEY,      -- e.g., TEST-ML-001
+  company_id UUID NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  category VARCHAR(100) NOT NULL,
+  complexity VARCHAR(20) NOT NULL,
+  time_limit INTEGER NOT NULL,
+  markdown_content TEXT NOT NULL,
+  json_content JSONB NOT NULL,
+  is_enabled BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  version INTEGER DEFAULT 1,
+  created_by UUID REFERENCES users(id),
+  last_modified_by UUID REFERENCES users(id)
+);
+
+-- Create test history table
+CREATE TABLE test_history (
+  id SERIAL PRIMARY KEY,
+  test_id VARCHAR(50) REFERENCES tests(id),
+  action VARCHAR(50) NOT NULL,
+  markdown_content TEXT,
+  json_content JSONB,
+  changes JSONB,
+  performed_by UUID REFERENCES users(id),
+  performed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- Test Usage Stats
+CREATE TABLE test_usage (
+  id SERIAL PRIMARY KEY,
+  test_id VARCHAR(50) REFERENCES tests(id),
+  user_id UUID REFERENCES users(id),
+  started_at TIMESTAMP NOT NULL,
+  completed_at TIMESTAMP,
+  score INTEGER,
+  feedback TEXT
+);
