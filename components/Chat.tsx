@@ -305,7 +305,7 @@ export default function Chat({ onSendMessage, onGenerateImage }: ChatProps) {
       return;
     }
 
-    const newUserMessage: ChatMessage = { role: "user", content: getOptionText(option) }
+    const newUserMessage: ChatMessage = { role: "user", content: getOptionText(option) || "" }
     setChatHistory((prev) => [...prev, newUserMessage])
 
     setIsAiThinking(true)

@@ -194,6 +194,73 @@ const checkImageUrls = async (content: string): Promise<string[]> => {
   return brokenUrls;
 };
 
+/**
+ * Parses a string containing multiple questions separated by "---" into an array of individual questions
+ * while preserving table formatting in markdown
+ */
+export function parseQuestions(text: string): string[] {
+  if (!text) return [];
+  
+  // Regex to match question separators (three or more dashes)
+  // But only when they are on their own line and not part of a table
+  // A table row typically has | characters and dashes between them
+  const questionSeparatorRegex = /^(?<!\|)\s*---+\s*$/gm;
+  
+  // Split by the separator
+  const questions = text.split(questionSeparatorRegex)
+    .map((q: string) => q.trim())
+    .filter((q: string) => q.length > 0);
+  
+  return questions;
+}
+
+/**
+ * Alternative implementation using a more sophisticated approach
+ * This handles tables better by checking context
+ */
+export function parseQuestionsAdvanced(text: string): string[] {
+  if (!text) return [];
+  
+  const lines = text.split('\n');
+  const questions: string[] = [];
+  let currentQuestion: string[] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Check if this is a separator line (three or more dashes on its own line)
+    const isSeparator = /^\s*---+\s*$/.test(line);
+    
+    // Check if this might be part of a table
+    // Look at previous and next lines for table context
+    const prevLine = i > 0 ? lines[i-1] : '';
+    const nextLine = i < lines.length - 1 ? lines[i+1] : '';
+    
+    const isPrevLineTable = prevLine.includes('|');
+    const isNextLineTable = nextLine.includes('|');
+    const isCurrentLineTable = line.includes('|');
+    
+    // If it's a separator but not part of a table
+    if (isSeparator && !(isPrevLineTable || isNextLineTable || isCurrentLineTable)) {
+      // Save the current question if it's not empty
+      if (currentQuestion.length > 0) {
+        questions.push(currentQuestion.join('\n'));
+        currentQuestion = [];
+      }
+    } else {
+      // Add the line to the current question
+      currentQuestion.push(line);
+    }
+  }
+  
+  // Add the last question if there is one
+  if (currentQuestion.length > 0) {
+    questions.push(currentQuestion.join('\n'));
+  }
+  
+  return questions.map((q: string) => q.trim()).filter((q: string) => q.length > 0);
+}
+
 export default function TestManager({ companyId, user, testId, view = 'new' }: TestManagerProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -863,16 +930,13 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
       
       // Parse for preview if content exists
       if (data.content) {
-        const questions = data.content
-          .split('---')
-          .map((q: string, i: number) => ({ id: `q${i+1}`, question: q.trim() }))
-          .filter((q: {id: string, question: string}) => q.question);
+        const questions = parseQuestionsAdvanced(data.content);
         
         setPreviewJson({
           id: testId,
           title: data.title,
           time_limit: data.time_limit,
-          questions: questions
+          questions: questions.map((q, i) => ({ id: `q${i+1}`, question: q }))
         });
         
         // Save to complexity content cache
@@ -884,7 +948,7 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
               id: testId,
               title: data.title,
               time_limit: data.time_limit,
-              questions: questions
+              questions: questions.map((q, i) => ({ id: `q${i+1}`, question: q }))
             }
           }
         }));
@@ -948,11 +1012,11 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
                   (currentComplexity === 'Advanced' && markdownContent.trim().length > 0)
       };
       
-      // If no content in any complexity, show error
-      if (!hasContent.Easy && !hasContent.Medium && !hasContent.Advanced) {
+      // If no content in all complexity, show error
+      if (!hasContent.Easy || !hasContent.Medium || !hasContent.Advanced) {
         toast({
           title: "Error",
-          description: "Please add content for at least one complexity level",
+          description: "Please add content for all 3 complexity level",
           variant: "destructive"
         });
         setIsSaving(false);
@@ -1180,16 +1244,13 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
     }
     
     // Parse markdown to JSON
-    const questions = markdownContent
-      .split('---')
-      .map((q: string, i: number) => ({ id: `q${i+1}`, question: q.trim() }))
-      .filter((q: {id: string, question: string}) => q.question);
+    const questions = parseQuestionsAdvanced(markdownContent);
     
     const previewData = {
       id: selectedNode?.testIds?.[selectedComplexity.toLowerCase() as keyof typeof selectedNode.testIds] || "preview",
       title: selectedNode?.name || "Preview",
       time_limit: timeLimit,
-      questions
+      questions: questions.map((q, i) => ({ id: `q${i+1}`, question: q }))
     };
     
     setPreviewJson(previewData);
@@ -1328,7 +1389,7 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
       setShowValidationProgress(20);
 
       // 2. Count questions
-      const questions = content.split('---').filter(q => q.trim().length > 0);
+      const questions = parseQuestionsAdvanced(content);
       if (questions.length > MAX_QUESTIONS) {
         errors.push({
           type: 'question_limit',

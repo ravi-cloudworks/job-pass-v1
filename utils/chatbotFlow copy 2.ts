@@ -67,24 +67,6 @@ export interface ChatbotFlow {
   options: { [key: string]: ChatbotOption };
 }
 
-// Add this interface to define the test structure
-interface TestNode {
-  id: string;
-  name: string;
-  testIds?: {
-    easy?: string;
-    medium?: string;
-    advanced?: string;
-  };
-}
-
-// Add this interface to define the category structure
-interface CategoryNode {
-  id: string;
-  name: string;
-  children?: TestNode[];
-}
-
 /**
  * Gets the company ID from the URL search parameters
  * @returns The company ID or null if not present
@@ -149,13 +131,12 @@ export async function loadCompanyRegistry(): Promise<CompanyRegistry> {
   try {
     console.log('📥 Fetching company registry from Supabase');
 
-    // Update the query to match your actual database schema - remove logo field
     const { data, error } = await supabase
       .from('companies')
-      .select('id, name') // Only select fields that exist
+      .select('id, name, json_file, logo, updated_at')
       .order('name');
 
-    console.log("READ COMPANIES TABLE FROM SUPABASE");
+    console.log("READ COMPANIES TABLE FROM SUPABASE")
 
     if (error) {
       throw new Error(`Error fetching company registry: ${error.message}`);
@@ -172,46 +153,39 @@ export async function loadCompanyRegistry(): Promise<CompanyRegistry> {
       lastUpdated: new Date().toISOString()
     };
 
-    data.forEach((company: any) => {
+    data.forEach((company: CompanyData) => {
       registry.companies[company.id] = {
         name: company.name,
-        jsonFile: company.id, // Use company ID as the jsonFile identifier
-        logo: '' // Use empty string for logo since it doesn't exist
+        jsonFile: company.json_file,
+        logo: company.logo
       };
     });
 
-    // Store in memory
+    // Store in memory cache and localStorage
+    companyRegistryCache = registry;
     companyRegistry = registry;
 
-    // Also store in localStorage for persistence across sessions
     if (typeof window !== 'undefined') {
       localStorage.setItem('company-registry-data', JSON.stringify(registry));
-      console.log(`💾 Stored company registry in localStorage`);
+      console.log('💾 Stored company registry in localStorage');
     }
 
-    console.log(`✅ Loaded company registry`);
     return registry;
   } catch (error) {
     console.error('Error loading company registry:', error);
-    
-    // Return a minimal registry with just the requested company ID
-    // This ensures the flow can continue even if the registry load fails
-    const fallbackRegistry: CompanyRegistry = {
-      companies: {},
-      default: 'chatbot-flow.json',
-      lastUpdated: new Date().toISOString()
+
+    // Return a minimal registry if needed for fallback
+    const fallbackRegistry = {
+      companies: {
+        default: {
+          name: 'Default',
+          jsonFile: 'chatbot-flow.json',
+          logo: 'default-logo.svg'
+        }
+      },
+      default: 'chatbot-flow.json'
     };
-    
-    // If we have a company ID in the URL, add it to the fallback registry
-    const urlCompanyId = getCompanyIdFromUrl();
-    if (urlCompanyId) {
-      fallbackRegistry.companies[urlCompanyId] = {
-        name: `Company ${urlCompanyId}`,
-        jsonFile: urlCompanyId,
-        logo: ''
-      };
-    }
-    
+
     companyRegistry = fallbackRegistry;
     return fallbackRegistry;
   }
@@ -288,7 +262,7 @@ async function fetchMetadataFromFile(filename: string): Promise<Metadata | null>
 
 /**
  * Loads the appropriate chatbot flow based on the company ID
- * with efficient caching using database queries when company ID is provided
+ * with efficient caching using partial reads
  * @param companyId The company ID to load flow for
  * @returns The chatbot flow data
  */
@@ -299,19 +273,29 @@ export async function loadChatbotFlow(companyId: string | null): Promise<Chatbot
     return defaultChatbotFlowData as ChatbotFlow;
   }
 
-  // Check if company exists in registry
+  console.log(`Loading flow for company ID: ${companyId}`);
+
+  // Check if the company ID exists in the registry
   if (companyRegistry.companies && companyId in companyRegistry.companies) {
     const companyData = companyRegistry.companies[companyId];
     console.log(`Found company in registry: ${companyId} (${companyData.name})`);
 
     try {
-      // Check localStorage cache first if we're in a browser environment
+      // Check localStorage first if we're in a browser environment
       if (typeof window !== 'undefined') {
         const cachedDataString = localStorage.getItem(`${companyId}-flow-data`);
 
-        if (cachedDataString && !SKIP_CHATFLOW_METADATA_CHECK) {
+        if (cachedDataString) {
           try {
+            console.log(`Found cached data for ${companyId}`);
             const cachedData = JSON.parse(cachedDataString);
+
+            // If SKIP flag is true, use cached data without checking for updates
+            if (SKIP_CHATFLOW_METADATA_CHECK) {
+              console.log(`⚡ Using cached flow for company: ${companyId} (skipping metadata check)`);
+              return cachedData.data;
+            }
+
             const cachedMetadata = cachedData.metadata;
 
             // Check if we have lastUpdated before trying to parse it
@@ -320,19 +304,13 @@ export async function loadChatbotFlow(companyId: string | null): Promise<Chatbot
 
               console.log(`Cached data timestamp: ${cachedMetadata.lastUpdated}`);
 
-              // Instead of fetching metadata from file, check database timestamp
-              const { data: testMenuData, error: testMenuError } = await supabase
-                .from('test_menus')
-                .select('updated_at')
-                .eq('company_id', companyId)
-                .order('updated_at', { ascending: false })
-                .limit(1);
+              // Fetch just the metadata to check if we need to update
+              const jsonFile = companyData.jsonFile;
+              const currentMetadata = await fetchMetadataFromFile(jsonFile);
 
-              if (testMenuError) {
-                console.error('Error checking test menu timestamp:', testMenuError);
-              } else if (testMenuData && testMenuData.length > 0) {
-                const serverLastUpdated = new Date(testMenuData[0].updated_at).getTime();
-                console.log(`Server data timestamp: ${testMenuData[0].updated_at}`);
+              if (currentMetadata?.lastUpdated) {
+                const serverLastUpdated = new Date(currentMetadata.lastUpdated).getTime();
+                console.log(`Server data timestamp: ${currentMetadata.lastUpdated}`);
 
                 if (cachedLastUpdated >= serverLastUpdated) {
                   console.log(`✅ Using cached flow for company: ${companyId} (cache is current)`);
@@ -356,115 +334,38 @@ export async function loadChatbotFlow(companyId: string | null): Promise<Chatbot
       // If we reach here, we need to fetch fresh data
       let flowData: ChatbotFlow;
 
-      console.log(`📥 Fetching flow data for company: ${companyId} from database`);
+      console.log(`📥 Fetching full flow data for company: ${companyId}`);
 
-      // Fetch test menu structure from database
-      const { data: menuData, error: menuError } = await supabase
-        .from('test_menus')
-        .select('*')
-        .eq('company_id', companyId);
+      const jsonFile = companyData.jsonFile;
 
-      if (menuError) {
-        console.error('Error fetching test menu:', menuError);
-        throw new Error(`Failed to fetch test menu: ${menuError.message}`);
+      console.log(`Fetching from storage bucket: ${STORAGE_BUCKET}, file: ${jsonFile}`);
+
+      // Use the Supabase client's storage methods to download the file
+      const { data, error } = await supabase
+        .storage
+        .from(STORAGE_BUCKET)
+        .download(jsonFile);
+
+      if (error) {
+        console.error('Storage download error details:', error);
+        throw new Error(`Failed to fetch flow data: ${error.message || JSON.stringify(error)}`);
       }
 
-      console.log('Menu data from database:', menuData);
+      // Convert the downloaded data to text
+      const text = await data.text();
 
-      // Transform menu data into chatbot flow structure
-      flowData = {
-        metadata: {
-          company: companyId,
-          lastUpdated: new Date().toISOString(),
-          version: "1.0"
-        },
-        nodes: {
-          root: {
-            question: "What type of interview would you like to practice?",
-            options: []
-          }
-        },
-        options: {}
-      };
+      // Parse the JSON text
+      try {
+        flowData = JSON.parse(text) as ChatbotFlow;
+      } catch (error) {
+        // Use a different variable name to avoid redeclaration
+        // and properly handle the error type
+        const jsonError = error instanceof Error
+          ? error.message
+          : 'Unknown JSON parsing error';
 
-      // Process menu data to build nodes and options
-      if (menuData && menuData.length > 0) {
-        // Get the menu structure from the first record
-        const menuStructure = menuData[0].menu_json;
-        
-        console.log('Menu structure:', menuStructure);
-        
-        if (Array.isArray(menuStructure)) {
-          // First, organize by categories
-          const categoryKeys: string[] = [];
-          
-          menuStructure.forEach((category: CategoryNode) => {
-            if (!category.name) {
-              console.warn('Category missing name:', category);
-              return;
-            }
-            
-            const categoryKey = `category_${category.id}`;
-            categoryKeys.push(categoryKey);
-            
-            // Create category node
-            flowData.nodes[categoryKey] = {
-              question: `You selected ${category.name}. What specific area would you like to focus on?`,
-              options: [],
-              parent: "root"
-            };
-            
-            // Create option for this category
-            flowData.options[categoryKey] = {
-              text: category.name
-            };
-            
-            // Add tests as options to this category
-            if (category.children && Array.isArray(category.children)) {
-              category.children.forEach((test: TestNode) => {
-                if (!test.name) {
-                  console.warn('Test missing name:', test);
-                  return;
-                }
-                
-                const testKey = `test_${test.id}`;
-                
-                // Create test node with question set IDs
-                flowData.nodes[testKey] = {
-                  question: `You selected ${test.name}. What complexity level do you prefer?`,
-                  options: ["Easy", "Medium", "Advanced"],
-                  text: test.name,
-                  parent: categoryKey,
-                  questionSetId: {
-                    [testKey]: {
-                      standard: {
-                        easy: test.testIds?.easy ? [test.testIds.easy] : [],
-                        medium: test.testIds?.medium ? [test.testIds.medium] : [],
-                        advanced: test.testIds?.advanced ? [test.testIds.advanced] : []
-                      }
-                    }
-                  }
-                };
-                
-                // Create option for this test
-                flowData.options[testKey] = {
-                  text: test.name
-                };
-                
-                // Add test to category options
-                flowData.nodes[categoryKey].options?.push(testKey);
-              });
-            }
-          });
-          
-          // Add categories as options to root node
-          flowData.nodes.root.options = categoryKeys;
-        } else {
-          console.error('Menu structure is not an array:', menuStructure);
-        }
+        throw new Error(`Failed to parse JSON data: ${jsonError}`);
       }
-
-      console.log('Transformed flow data:', flowData);
 
       // Store in memory cache
       flowCache[companyId] = flowData;
@@ -573,30 +474,50 @@ if (typeof window !== 'undefined') {
 
 export function getNode(key: string): ChatbotNode {
   console.log(`🔍 Getting node with key: "${key}" from flow`);
-  console.log(`🔍 Getting node with key: "${key}" from flow`);
-  return chatbotFlow.nodes[key];
-}
+  console.log(`🔍 Current root question: "${chatbotFlow.nodes.root.question}"`);
 
-/**
- * Gets the text for an option from the chatbot flow
- * @param optionKey The key of the option to get text for
- * @returns The text of the option or undefined if not found
- */
-export function getOptionText(optionKey: string): string | undefined {
-  if (!optionKey || !chatbotFlow.options[optionKey]) {
-    console.log(`Option key "${optionKey}" not found in flow`);
-    return undefined;
+  const node = chatbotFlow.nodes[key];
+  if (!node) {
+    console.warn(`⚠️ Node with key "${key}" not found in chatbot flow`);
+
+    // Check if it's an option instead
+    const option = chatbotFlow.options[key];
+    if (option) {
+      console.log(`✓ Found option with key "${key}": ${option.text}`);
+      return {
+        question: `You selected ${option.text}. What complexity level do you prefer?`,
+        options: ["Easy", "Medium", 'Advanced'],
+        isEndpoint: true,
+        text: option.text,
+      };
+    }
+    console.error(`❌ Node or option with key "${key}" not found in chatbot flow.`);
+    return {
+      question: "I'm sorry, but I couldn't find the next question. Let's start over.",
+      options: ["root"],
+    };
   }
-  
-  return chatbotFlow.options[optionKey].text;
+
+  console.log(`✓ Found node with key "${key}": ${node.text || node.question}`);
+  return {
+    ...node,
+    question: node.question || node.text || "",
+  };
 }
 
-/**
- * Gets the question set ID for a node and complexity
- * @param node The node to get the question set ID for
- * @param complexity The complexity level (easy, medium, advanced)
- * @returns The question set ID or undefined if not found
- */
+export function getOptionText(option: string): string {
+  // Special cases
+  if (option === "start_over") {
+    return "Start Over Again";
+  }
+
+  // For other options, replace underscores with spaces and capitalize first letter
+  return option
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 export function getQuestionSetId(node: ChatbotNode, complexity: string): string | undefined {
   console.log('Getting question set ID for:', {
     nodeText: node.text,
@@ -612,18 +533,7 @@ export function getQuestionSetId(node: ChatbotNode, complexity: string): string 
 
   // Check if we're dealing with an option node (from getNode function)
   if (node.question?.includes('You selected') && node.text) {
-    // For database-sourced nodes, the structure is slightly different
-    // The questionSetId is directly on the node with the node's key
-    if (node.questionSetId) {
-      const key = Object.keys(node.questionSetId)[0];
-      if (key) {
-        const questionSetId = node.questionSetId[key].standard[complexity.toLowerCase()]?.[0];
-        console.log('Found direct question set ID:', questionSetId);
-        return questionSetId;
-      }
-    }
-
-    // If not found directly, try the original approach for JSON-sourced nodes
+    // Find the corresponding parent node from chatbotFlow
     const parentNodeEntry = Object.entries(chatbotFlow.nodes).find(([_, parentNode]) => {
       return parentNode.options?.some(option => {
         const optionText = chatbotFlow.options[option]?.text;
