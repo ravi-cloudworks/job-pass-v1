@@ -1,7 +1,7 @@
 // components/tests/TestManager.tsx
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
@@ -34,6 +34,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
+import { useToast } from "@/hooks/use-toast"
 
 // Constants
 const MAX_CHARS = 5000;
@@ -84,12 +85,25 @@ interface ValidationError {
   type: string;
   message: string;
   line?: number;
+  complexity?: string;
 }
 
 // Add this near your other interfaces
 interface BrokenImage {
   url: string;
   error: string;
+}
+
+// Define an interface for the test content to avoid TypeScript errors
+interface TestContentData {
+  id: string;
+  title: string;
+  content: string;
+  company_id: string | null | undefined;
+  complexity: string;
+  category?: string;
+  time_limit?: number;
+  created_at?: string;
 }
 
 // Add these functions near the top of the file, after the interfaces
@@ -130,15 +144,10 @@ const validateMarkdownStructure = (content: string): ValidationError[] => {
     });
   }
   
-  // Check for proper headings
+  // Check for proper question structure but don't require headings
   const questions = content.split('---').filter(q => q.trim());
   questions.forEach((q, idx) => {
-    if (!q.includes('#')) {
-      errors.push({
-        type: 'format',
-        message: `Question ${idx + 1} missing title (# heading)`
-      });
-    }
+    // Remove the heading check
     if (q.length < 50) {
       errors.push({
         type: 'content',
@@ -187,6 +196,7 @@ const checkImageUrls = async (content: string): Promise<string[]> => {
 
 export default function TestManager({ companyId, user, testId, view = 'new' }: TestManagerProps) {
   const router = useRouter();
+  const { toast } = useToast();
 
   // Menu structure state
   const [menuStructure, setMenuStructure] = useState<MenuNode[]>([]);
@@ -220,12 +230,6 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
 
   const [showImageFixDialog, setShowImageFixDialog] = useState(false);
  
-  interface ValidationError {
-    type: string;
-    message: string;
-    line?: number;
-  }
-  
   // Complexity content state
   const [complexityContent, setComplexityContent] = useState<{
     [key: string]: { markdown: string, preview: any | null }
@@ -238,35 +242,81 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
   // In your component, add state for broken images
   const [brokenImages, setBrokenImages] = useState<string[]>([]);
 
-  // Add this useEffect near other hooks at the top of the component
-  useEffect(() => {
-    if (activeTab === 'preview') {
-      const validateAndPreview = async () => {
-        // Validate content before showing preview
-        const validationResult = await enhancedValidateContent(markdownContent);
-        if (validationResult.length > 0) {
-          setValidationErrors(validationResult);
-          setShowValidationDialog(true);
-          setActiveTab('questions');
-        } else {
-          const questions = markdownContent
-            .split('---')
-            .map((q: string, i: number) => ({ id: `q${i+1}`, question: q.trim() }))
-            .filter((q: {id: string, question: string}) => q.question);
-          
-          setPreviewJson({
-            id: selectedNode?.testIds?.[selectedComplexity.toLowerCase() as keyof typeof selectedNode.testIds] || "preview",
-            title: selectedNode?.name || "Preview",
-            time_limit: timeLimit,
-            questions
-          });
-          setCurrentQuestionIndex(0);
-        }
-      };
+  // Add undo/redo history state
+  const [history, setHistory] = useState<{time: number, content: string}[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const historyLimit = 50; // Maximum number of history states to keep
+  const historyDebounceTime = 2000; // Time in ms between history snapshots
+  const lastHistoryUpdateRef = useRef<number>(0);
+  
+  // Add save status tracking
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Track if content has been modified since last save
+  const [isModified, setIsModified] = useState(false);
+  
+  // Add this state to track validation status for each complexity
+  const [complexityValidation, setComplexityValidation] = useState<{
+    [key: string]: { isValid: boolean; errors: ValidationError[] }
+  }>({
+    Easy: { isValid: false, errors: [] },
+    Medium: { isValid: false, errors: [] },
+    Advanced: { isValid: false, errors: [] }
+  });
+  
+  // Handle content changes with time-based history tracking
+  const handleContentChange = (newContent: string) => {
+    // Update content immediately
+    setMarkdownContent(newContent);
+    setIsModified(true);
+    
+    // Add to history only after debounce time has passed
+    const now = Date.now();
+    if (now - lastHistoryUpdateRef.current > historyDebounceTime) {
+      // If we're not at the end of history, truncate it
+      if (historyIndex < history.length - 1) {
+        setHistory(history.slice(0, historyIndex + 1));
+      }
       
-      validateAndPreview();
+      // Add new content to history
+      const newHistory = [...history.slice(-historyLimit + 1), {time: now, content: newContent}];
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+      lastHistoryUpdateRef.current = now;
     }
-  }, [activeTab, markdownContent]);
+  };
+  
+  // Undo function
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setMarkdownContent(history[newIndex].content);
+      setIsModified(true);
+    }
+  };
+  
+  // Redo function
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setMarkdownContent(history[newIndex].content);
+      setIsModified(true);
+    }
+  };
+  
+  // Initialize history when a new test is selected
+  useEffect(() => {
+    if (markdownContent) {
+      const now = Date.now();
+      setHistory([{time: now, content: markdownContent}]);
+      setHistoryIndex(0);
+      lastHistoryUpdateRef.current = now;
+      setIsModified(false);
+    }
+  }, [selectedNode?.id, selectedComplexity]);
 
   // Load menu structure and company info
   useEffect(() => {
@@ -340,7 +390,7 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
               
               if (!testError && testData) {
                 setTestContent(testData);
-                setMarkdownContent(testData.markdown_content);
+                setMarkdownContent(testData.content || "");
                 setTimeLimit(testData.time_limit);
               }
             }
@@ -348,7 +398,11 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
         }
       } catch (error) {
         console.error("Error loading data:", error);
-        toast.error("Failed to load data");
+        toast({
+          title: "Error",
+          description: "Failed to load data",
+          variant: "destructive"
+        });
       } finally {
         setIsLoading(false);
       }
@@ -396,12 +450,12 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
             }
           } else {
             setTestContent(data);
-            setMarkdownContent(data.markdown_content || "");
+            setMarkdownContent(data.content || "");
             setTimeLimit(data.time_limit || 900);
             
             // Parse for preview
-            if (data.markdown_content) {
-              const questions = data.markdown_content
+            if (data.content) {
+              const questions = data.content
                 .split('---')
                 .map((q: string, i: number) => ({ id: `q${i+1}`, question: q.trim() }))
                 .filter((q: {id: string, question: string}) => q.question);
@@ -416,7 +470,11 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
           }
         } catch (error) {
           console.error("Error loading test:", error);
-          toast.error("Failed to load test content");
+          toast({
+            title: "Error",
+            description: "Failed to load test content",
+            variant: "destructive"
+          });
         }
       } else {
         // New test for this complexity
@@ -431,7 +489,11 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
   // Add new category
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
-      toast.error("Category name cannot be empty");
+      toast({
+        title: "Error",
+        description: "Category name cannot be empty",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -461,7 +523,6 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
           .from("test_menus")
           .update({
             menu_json: updatedStructure,
-            last_modified_by: user.id,
             updated_at: new Date().toISOString()
           })
           .eq("company_id", companyId);
@@ -472,30 +533,45 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
           .insert({
             company_id: companyId,
             menu_json: updatedStructure,
-            last_modified_by: user.id,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           });
       }
       
-      toast.success("Category added successfully");
+      toast({
+        title: "Success",
+        description: "Category added successfully",
+        variant: "default"
+      });
       setNewCategoryName("");
       setShowAddCategoryDialog(false);
     } catch (error) {
       console.error("Error saving category:", error);
-      toast.error("Failed to save category");
+      toast({
+        title: "Error",
+        description: "Failed to save category",
+        variant: "destructive"
+      });
     }
   };
 
   // Add new test to category
   const handleAddTest = async () => {
     if (!selectedCategory) {
-      toast.error("No category selected");
+      toast({
+        title: "Error",
+        description: "No category selected",
+        variant: "destructive"
+      });
       return;
     }
     
     if (!newTestName.trim()) {
-      toast.error("Test name cannot be empty");
+      toast({
+        title: "Error",
+        description: "Test name cannot be empty",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -542,40 +618,27 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
       
       // Update menu structure
       const updatedMenu = [...menuStructure];
-      
+
       // Find the selected category and add the new test
-      const findAndUpdateCategory = (nodes: MenuNode[]): boolean => {
-        if (!selectedCategory) return false;
-        
-        for (let i = 0; i < nodes.length; i++) {
-          if (nodes[i].id === selectedCategory.id) {
-            // Create a local reference to the current node to help TypeScript track the changes
-            const currentNode = nodes[i];
-            
-            // Initialize the children array if it doesn't exist
-            if (!currentNode.children) {
-              currentNode.children = [];
-            }
-            
-            // Now we can safely push to the array
-            currentNode.children.push(newTest);
-            return true;
+      for (let i = 0; i < updatedMenu.length; i++) {
+        // Check if selectedCategory exists and has an id
+        if (selectedCategory && updatedMenu[i].id === selectedCategory.id) {
+          // Ensure children is an array
+          if (!updatedMenu[i].children) {
+            updatedMenu[i].children = [];
           }
           
-          // For the recursive case, be extra careful with type checking
-          const children = nodes[i].children;
-          if (children && children.length > 0) {
-            // Pass a copy or explicitly cast to avoid TypeScript confusion
-            const result = findAndUpdateCategory([...children]);
-            if (result) {
-              return true;
-            }
+          // TypeScript needs reassurance that children exists and is an array
+          const children = updatedMenu[i].children;
+          if (Array.isArray(children)) {
+            // Now TypeScript knows it's a valid array
+            children.push(newTest);
           }
+          
+          break;
         }
-        return false;
-      };
+      }
       
-      findAndUpdateCategory(updatedMenu);
       setMenuStructure(updatedMenu);
       
       // Check if menu record exists
@@ -592,8 +655,7 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
           .update({
             menu_json: updatedMenu,
             menu_text: JSON.stringify(updatedMenu),
-            updated_at: new Date().toISOString(),
-            last_modified_by: user.id
+            updated_at: new Date().toISOString()
           })
           .eq("company_id", companyId);
       } else {
@@ -604,17 +666,29 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
             company_id: companyId,
             menu_json: updatedMenu,
             menu_text: JSON.stringify(updatedMenu),
-            last_modified_by: user.id
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
       }
       
       setShowAddTestDialog(false);
       setNewTestName("");
-      toast.success("Test added successfully");
+      toast({
+        title: "Success",
+        description: "Test added successfully",
+        variant: "default"
+      });
+      
+      // Force re-render of the tree
+      setExpandedNodes([...expandedNodes, selectedCategory.id]);
       
     } catch (error) {
       console.error("Error adding test:", error);
-      toast.error("Failed to add test");
+      toast({
+        title: "Error",
+        description: "Failed to add test",
+        variant: "destructive"
+      });
     }
   };
 
@@ -654,6 +728,11 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
         }
       }
       
+      // Filter out any empty categories (no name or no valid ID)
+      updatedStructure = updatedStructure.filter(category => 
+        category.id && category.name && category.name.trim() !== ""
+      );
+      
       // Check if a menu record already exists for this company
       const { data: existingMenu, error: menuError } = await supabase
         .from("test_menus")
@@ -673,8 +752,7 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
           .update({
             menu_json: updatedStructure,
             menu_text: JSON.stringify(updatedStructure),
-            updated_at: new Date().toISOString(),
-            last_modified_by: user?.id || null
+            updated_at: new Date().toISOString()
           })
           .eq("company_id", companyId);
       } else {
@@ -685,14 +763,17 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
             company_id: companyId,
             menu_json: updatedStructure,
             menu_text: JSON.stringify(updatedStructure),
-            last_modified_by: user?.id || null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           });
       }
       
       setMenuStructure(updatedStructure);
-      toast.success("Deleted successfully");
+      toast({
+        title: "Success",
+        description: "Deleted successfully",
+        variant: "default"
+      });
       setShowDeleteDialog(false);
       setNodeToDelete(null);
       
@@ -704,7 +785,11 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
       }
     } catch (error) {
       console.error("Error deleting:", error);
-      toast.error("Failed to delete");
+      toast({
+        title: "Error",
+        description: "Failed to delete",
+        variant: "destructive"
+      });
     }
   };
 
@@ -766,17 +851,6 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
           setMarkdownContent("");
           const complexityLevel = COMPLEXITY_LEVELS.find(c => c.name === selectedComplexity);
           setTimeLimit(complexityLevel ? complexityLevel.time * 60 : 900);
-          
-          // Set empty preview
-          if (selectedNode) {
-            setPreviewJson({
-              id: testId,
-              title: selectedNode.name,
-              time_limit: complexityLevel ? complexityLevel.time * 60 : 900,
-              questions: []
-            });
-          }
-          
           return null;
         } else {
           throw error;
@@ -784,88 +858,311 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
       }
       
       setTestContent(data);
-      setMarkdownContent(data.markdown_content || "");
-      const complexityLevel = COMPLEXITY_LEVELS.find(c => c.name === selectedComplexity);
-      setTimeLimit(complexityLevel ? complexityLevel.time * 60 : 900);
+      setMarkdownContent(data.content || "");
+      setTimeLimit(data.time_limit || 900);
       
-      // Parse questions for preview if content exists
-      if (data.markdown_content) {
-        const questions = data.markdown_content
+      // Parse for preview if content exists
+      if (data.content) {
+        const questions = data.content
           .split('---')
           .map((q: string, i: number) => ({ id: `q${i+1}`, question: q.trim() }))
           .filter((q: {id: string, question: string}) => q.question);
         
-        const preview = {
+        setPreviewJson({
           id: testId,
           title: data.title,
           time_limit: data.time_limit,
           questions: questions
-        };
+        });
         
-        setPreviewJson(preview);
-        
-        // Save to complexity content
+        // Save to complexity content cache
         setComplexityContent(prev => ({
           ...prev,
           [selectedComplexity]: { 
-            markdown: data.markdown_content, 
-            preview: preview 
+            markdown: data.content, 
+            preview: {
+              id: testId,
+              title: data.title,
+              time_limit: data.time_limit,
+              questions: questions
+            }
           }
         }));
       }
+      
       return data;
     } catch (error) {
       console.error("Error loading test:", error);
-      // Don't clear content on error
+      toast({
+        title: "Error",
+        description: "Failed to load test content",
+        variant: "destructive"
+      });
       throw error;
     }
   };
 
-  // Save test content
+  // Enhanced save function that handles all complexities
   const handleSaveContent = async () => {
     if (!selectedNode || !selectedNode.testIds) {
-      toast.error("No test selected");
+      toast({
+        title: "Error",
+        description: "No test selected",
+        variant: "destructive"
+      });
       return;
     }
     
     setIsSaving(true);
+    setSaveStatus('saving');
     
     try {
-      // Validate content
-      const validationResult = await enhancedValidateContent(markdownContent);
+      // Store current complexity to restore it later
+      const currentComplexity = selectedComplexity;
       
-      // If there are broken images, show the image fix dialog
-      if (validationResult.some(error => error.type === 'broken_image')) {
-        setValidationErrors(validationResult);
-        setShowImageFixDialog(true);
+      // Save current content to complexity content
+      setComplexityContent(prev => ({
+        ...prev,
+        [currentComplexity]: { 
+          markdown: markdownContent, 
+          preview: null 
+        }
+      }));
+      
+      // Validate all complexities
+      const validationResults: {
+        [key: string]: { isValid: boolean; errors: ValidationError[] }
+      } = {
+        Easy: { isValid: false, errors: [] },
+        Medium: { isValid: false, errors: [] },
+        Advanced: { isValid: false, errors: [] }
+      };
+      
+      // Check which complexities have content
+      const hasContent: Record<string, boolean> = {
+        Easy: (complexityContent.Easy?.markdown?.trim().length ?? 0) > 0 || 
+              (currentComplexity === 'Easy' && markdownContent.trim().length > 0),
+        Medium: (complexityContent.Medium?.markdown?.trim().length ?? 0) > 0 || 
+                (currentComplexity === 'Medium' && markdownContent.trim().length > 0),
+        Advanced: (complexityContent.Advanced?.markdown?.trim().length ?? 0) > 0 || 
+                  (currentComplexity === 'Advanced' && markdownContent.trim().length > 0)
+      };
+      
+      // If no content in any complexity, show error
+      if (!hasContent.Easy && !hasContent.Medium && !hasContent.Advanced) {
+        toast({
+          title: "Error",
+          description: "Please add content for at least one complexity level",
+          variant: "destructive"
+        });
         setIsSaving(false);
+        setSaveStatus('error');
         return;
       }
       
-      // If there are other validation errors, show the validation dialog
-      if (validationResult.length > 0) {
-        setValidationErrors(validationResult);
+      // Validate each complexity that has content
+      for (const complexity of COMPLEXITY_LEVELS) {
+        const complexityName = complexity.name;
+        const content = complexityName === currentComplexity 
+          ? markdownContent 
+          : complexityContent[complexityName].markdown;
+        
+        if (content.trim().length > 0) {
+          const errors = await enhancedValidateContent(content);
+          validationResults[complexityName] = {
+            isValid: errors.length === 0,
+            errors: errors
+          };
+        } else {
+          // Skip validation for empty content
+          validationResults[complexityName] = { isValid: true, errors: [] };
+        }
+      }
+      
+      // Update validation state
+      setComplexityValidation(validationResults);
+      
+      // Check if any complexity has validation errors
+      const hasErrors = Object.values(validationResults).some(
+        result => !result.isValid && result.errors.length > 0
+      );
+      
+      if (hasErrors) {
+        // Find which complexity has errors
+        const complexitiesWithErrors = Object.entries(validationResults)
+          .filter(([_, result]) => !result.isValid && result.errors.length > 0)
+          .map(([complexity, _]) => complexity);
+        
+        // Show dialog with errors for each complexity
+        setValidationErrors(
+          complexitiesWithErrors.flatMap(complexity => 
+            validationResults[complexity].errors.map(error => ({
+              ...error,
+              complexity: complexity
+            }))
+          )
+        );
+        
+        // Show validation dialog with complexity information
         setShowValidationDialog(true);
         setIsSaving(false);
+        setSaveStatus('error');
         return;
       }
       
-      // Get the test ID for the current complexity
-      const testId = selectedNode.testIds?.[selectedComplexity.toLowerCase() as keyof typeof selectedNode.testIds];
+      // Save each complexity that has content
+      const savedTests = [];
       
-      if (!testId) {
-        toast.error("Test ID not found for selected complexity");
-        setIsSaving(false);
-        return;
+      for (const complexity of COMPLEXITY_LEVELS) {
+        const complexityName = complexity.name;
+        const content = complexityName === currentComplexity 
+          ? markdownContent 
+          : complexityContent[complexityName].markdown;
+        
+        if (content.trim().length > 0) {
+          // Get the test ID for this complexity
+          const complexityKey = complexityName.toLowerCase() as keyof typeof selectedNode.testIds;
+          let testId = selectedNode.testIds[complexityKey];
+          
+          // If no testId exists for this complexity, create one
+          if (!testId) {
+            testId = `${selectedNode.name.replace(/\s+/g, '-')}-${complexityName.toUpperCase()}-${Date.now()}`;
+            
+            // Update the node's testIds with the new ID
+            const updatedTestIds = {
+              ...selectedNode.testIds,
+              [complexityKey]: testId
+            };
+            
+            // Update the menu structure with the new testId
+            const updatedMenu = [...menuStructure];
+            const findAndUpdateCategory = (categories: MenuNode[]): boolean => {
+              if (!selectedNode) return false;
+              
+              for (let i = 0; i < categories.length; i++) {
+                const category = categories[i];
+                
+                if (category.children) {
+                  for (let j = 0; j < category.children.length; j++) {
+                    if (category.children[j].id === selectedNode.id) {
+                      category.children[j] = {
+                        ...category.children[j],
+                        testIds: updatedTestIds
+                      };
+                      return true;
+                    }
+                  }
+                }
+              }
+              return false;
+            };
+            
+            findAndUpdateCategory(updatedMenu);
+            setMenuStructure(updatedMenu);
+          }
+          
+          // Create test content object
+          const testContent: TestContentData = {
+            id: testId,
+            title: selectedNode.name,
+            content: content,
+            complexity: complexityName.toUpperCase(),
+            company_id: companyId,
+            category: findParentCategory(selectedNode, menuStructure),
+            time_limit: complexity.time * 60 // Convert minutes to seconds
+          };
+          
+          // Add optional properties
+          if (!testId || testId.includes('new_')) {
+            testContent.created_at = new Date().toISOString();
+          }
+          
+          // Save to tests table
+          const { data: savedTest, error: testError } = await supabase
+            .from("tests")
+            .upsert(testContent, { onConflict: 'id' })
+            .select();
+          
+          if (testError) {
+            console.error(`Error saving ${complexityName} test:`, testError);
+            throw testError;
+          }
+          
+          savedTests.push(savedTest);
+        }
       }
       
-      // Save the content
-      // ... rest of your save logic
+      // Update menu structure in database
+      const { data: existingMenu, error: menuQueryError } = await supabase
+        .from("test_menus")
+        .select("id")
+        .eq("company_id", companyId)
+        .maybeSingle();
       
-      toast.success("Content saved successfully");
+      if (menuQueryError && menuQueryError.code !== 'PGRST116') {
+        console.error("Error checking for existing menu:", menuQueryError);
+        throw menuQueryError;
+      }
+      
+      let menuUpdateResult;
+      if (existingMenu?.id) {
+        menuUpdateResult = await supabase
+          .from("test_menus")
+          .update({
+            menu_json: menuStructure,
+            updated_at: new Date().toISOString()
+          })
+          .eq("company_id", companyId);
+      } else {
+        menuUpdateResult = await supabase
+          .from("test_menus")
+          .insert({
+            company_id: companyId,
+            menu_json: menuStructure,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+      }
+      
+      if (menuUpdateResult.error) {
+        console.error("Error updating menu structure:", menuUpdateResult.error);
+        throw menuUpdateResult.error;
+      }
+      
+      // Mark as not modified after successful save
+      setIsModified(false);
+      setSaveStatus('success');
+      
+      // Show success message with complexity info
+      const savedComplexities = savedTests.length > 0 
+        ? COMPLEXITY_LEVELS
+            .filter(c => hasContent[c.name])
+            .map(c => c.name)
+            .join(", ")
+        : "all";
+      
+      toast({
+        title: "Success",
+        description: `Content saved for ${savedComplexities} complexity levels`,
+        variant: "default"
+      });
+      
+      // Reset success status after a delay
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      saveTimeoutRef.current = setTimeout(() => {
+        setSaveStatus('idle');
+      }, 3000);
+      
     } catch (error) {
       console.error("Error saving content:", error);
-      toast.error("Failed to save content");
+      toast({
+        title: "Error",
+        description: "Failed to save content",
+        variant: "destructive"
+      });
+      setSaveStatus('error');
     } finally {
       setIsSaving(false);
     }
@@ -874,7 +1171,11 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
   // Preview test
   const handlePreview = () => {
     if (!markdownContent.trim()) {
-      toast.error("No content to preview");
+      toast({
+        title: "Error",
+        description: "No content to preview",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -1107,11 +1408,24 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
 
   // Move handleUrlReplacement inside the component
   const handleUrlReplacement = async (oldUrl: string, newUrl: string, input: HTMLInputElement) => {
+    if (!newUrl.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a replacement URL",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       // Validate new URL
       const domain = new URL(newUrl).hostname;
       if (!TRUSTED_DOMAINS.includes(domain)) {
-        toast.error("URL must be from a trusted domain");
+        toast({
+          title: "Error",
+          description: "URL must be from a trusted domain",
+          variant: "destructive"
+        });
         return;
       }
       
@@ -1128,14 +1442,22 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
       const validationResult = await enhancedValidateContent(updatedContent);
       setValidationErrors(validationResult);
       
-      toast.success("Image URL has been updated");
+      toast({
+        title: "Success",
+        description: "URL replaced successfully",
+        variant: "default"
+      });
       
       // If no more broken images, close the dialog
       if (validationResult.filter(e => e.type === 'broken_image').length === 0) {
         setShowImageFixDialog(false);
       }
     } catch (err) {
-      toast.error("Please enter a valid URL");
+      toast({
+        title: "Error",
+        description: "Please enter a valid URL",
+        variant: "destructive"
+      });
     }
   };
 
@@ -1189,7 +1511,11 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
         }, 0);
 
         // Show confirmation
-        toast.success("URL converted to markdown image format");
+        toast({
+          title: "Success",
+          description: "URL converted to markdown image format",
+          variant: "default"
+        });
       }
     }
   };
@@ -1227,13 +1553,20 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full">
-              <TabsTrigger value="questions" className="flex-1">Questions</TabsTrigger>
-              <TabsTrigger value="preview" className="flex-1">Preview</TabsTrigger>
+          <Tabs value={activeTab} onValueChange={(value) => {
+            setActiveTab(value);
+            // If switching to preview tab, generate preview
+            if (value === "preview") {
+              handlePreview();
+            }
+          }}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="questions">Questions</TabsTrigger>
+              <TabsTrigger value="preview">Preview</TabsTrigger>
+              <TabsTrigger value="validation">Validation</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="questions" className="p-4">
+            <TabsContent value="questions">
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
@@ -1251,11 +1584,33 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
                       <span className="text-muted-foreground">questions</span>
                     </div>
                   </div>
+                  
+                  {/* Undo/Redo buttons */}
+                  <div className="flex space-x-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleUndo}
+                      disabled={historyIndex <= 0}
+                      className="h-8 px-2"
+                    >
+                      Undo
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleRedo}
+                      disabled={historyIndex >= history.length - 1}
+                      className="h-8 px-2"
+                    >
+                      Redo
+                    </Button>
+                  </div>
                 </div>
                 
                 <Textarea
                   value={markdownContent}
-                  onChange={(e) => setMarkdownContent(e.target.value)}
+                  onChange={(e) => handleContentChange(e.target.value)}
                   onPaste={handlePaste}
                   placeholder="# Question 1&#10;&#10;Your question content here&#10;&#10;---&#10;&#10;# Question 2"
                   className="font-mono min-h-[400px]"
@@ -1278,7 +1633,7 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
               </div>
             </TabsContent>
             
-            <TabsContent value="preview" className="p-0">
+            <TabsContent value="preview">
               <div className="h-[500px] overflow-hidden">
                 {previewJson && previewJson.questions && previewJson.questions.length > 0 ? (
                   <div className="flex flex-col h-full">
@@ -1338,27 +1693,31 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
                 )}
               </div>
             </TabsContent>
+            
+            <TabsContent value="validation">
+              {/* ... existing validation tab content ... */}
+            </TabsContent>
           </Tabs>
         </CardContent>
       </>
     );
   };
 
-  // Add conditional rendering based on view
-  if (view === 'list') {
-    // Render test list view (previously in TestList.tsx)
-    // ...
-  }
+  // // Add conditional rendering based on view
+  // if (view === 'list') {
+  //   // Render test list view (previously in TestList.tsx)
+  //   // ...
+  // }
   
-  if (view === 'detail' && testId) {
-    // Render test detail view (previously in TestDetail.tsx)
-    // ...
-  }
+  // if (view === 'detail' && testId) {
+  //   // Render test detail view (previously in TestDetail.tsx)
+  //   // ...
+  // }
   
-  if (view === 'flow' && companyId) {
-    // Render flow manager view (previously in TestFlowManager.tsx)
-    // ...
-  }
+  // if (view === 'flow' && companyId) {
+  //   // Render flow manager view (previously in TestFlowManager.tsx)
+  //   // ...
+  // }
 
   if (isLoading) {
     return (
@@ -1415,23 +1774,37 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
         {/* Right Panel - Content Editor */}
         <Card className="lg:col-span-2">
           {renderContentEditor()}
-          <div className="flex justify-end space-x-2 p-4 border-t">
-            <Button 
-              onClick={handleSaveContent}
-              disabled={isSaving || !markdownContent.trim()}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save
-                </>
-              )}
-            </Button>
+          <div className="flex justify-between items-center p-4 border-t">
+            <div className="text-sm">
+              {isModified && <span className="text-amber-500">Unsaved changes</span>}
+              {saveStatus === 'success' && <span className="text-green-500">Saved successfully</span>}
+              {saveStatus === 'error' && <span className="text-red-500">Save failed</span>}
+            </div>
+            <div className="flex space-x-2">
+              {/* <Button 
+                variant="outline"
+                onClick={() => handlePreview()}
+                disabled={!markdownContent.trim()}
+              >
+                Preview
+              </Button> */}
+              <Button 
+                onClick={handleSaveContent}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </Card>
       </div>
@@ -1517,28 +1890,27 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
 
       {/* Validation Dialog */}
       <Dialog open={showValidationDialog} onOpenChange={setShowValidationDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Validation Issues</DialogTitle>
+            <DialogTitle>Content Validation Issues</DialogTitle>
             <DialogDescription>
               Please fix the following issues before saving:
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 max-h-[60vh] overflow-auto">
-            {/* Regular validation errors */}
-            <ul className="space-y-2">
-              {validationErrors.filter(e => e.type !== 'broken_image').map((error, index) => (
-                <li key={index} className="p-2 rounded bg-destructive/10">
-                  <div className="flex items-start">
-                    <AlertTriangle className="h-5 w-5 text-destructive mr-2 flex-shrink-0" />
-                    <span>{error.message}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {validationErrors.map((error, index) => (
+              <Alert key={index} variant="destructive" className="mb-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>
+                  {error.complexity ? `${error.complexity} Complexity: ` : ''}
+                  {error.type.charAt(0).toUpperCase() + error.type.slice(1)} Issue
+                </AlertTitle>
+                <AlertDescription>{error.message}</AlertDescription>
+              </Alert>
+            ))}
           </div>
           <DialogFooter>
-            <Button onClick={() => setShowValidationDialog(false)}>
+            <Button variant="outline" onClick={() => setShowValidationDialog(false)}>
               Close
             </Button>
           </DialogFooter>
@@ -1589,7 +1961,11 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
                                 if (input.value) {
                                   handleUrlReplacement(actualUrl, input.value, input);
                                 } else {
-                                  toast.error("Please enter a replacement URL");
+                                  toast({
+                                    title: "Error",
+                                    description: "Please enter a replacement URL",
+                                    variant: "destructive"
+                                  });
                                 }
                               }}
                             >
@@ -1620,3 +1996,13 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
     </>
   );
 }
+
+// Add the findParentCategory function
+const findParentCategory = (node: MenuNode, menuStructure: MenuNode[]): string => {
+  for (const category of menuStructure) {
+    if (category.children && category.children.some(child => child.id === node.id)) {
+      return category.name;
+    }
+  }
+  return ""; // Default if no parent category found
+};
