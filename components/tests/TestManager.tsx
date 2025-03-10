@@ -1693,10 +1693,7 @@ export default function TestManager({ companyId, user, testId, view = 'new' }: T
                 )}
               </div>
             </TabsContent>
-            
-            <TabsContent value="validation">
-              {/* ... existing validation tab content ... */}
-            </TabsContent>
+  
           </Tabs>
         </CardContent>
       </>
